@@ -66,15 +66,3 @@ nltk.download("omw-1.4")
 ```
 
 ---
-
-## Methodological Position
-
-PEEL-Local does not automate interpretation.
-
-Instead, it provides computational support for:
-- semantic inspection
-- lexical organization
-- clustering
-- structured interpretive analysis
-
-Interpretation remains researcher-driven.
