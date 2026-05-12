@@ -1,0 +1,39 @@
+{
+    "incList": [
+        "credibl",
+        "expert",
+        "expertis",
+        "knowledg",
+        "reli",
+        "reliabl",
+        "relianc",
+        "trust"
+    ],
+    "excList": [
+        "compet"
+    ],
+    "clusterDefs": [
+        {
+            "name": "Expertise",
+            "stems": [
+                "expert",
+                "expertis",
+                "knowledg"
+            ],
+            "excluded_stems": [
+                "compet"
+            ]
+        },
+        {
+            "name": "Trust",
+            "stems": [
+                "reliabl",
+                "reli",
+                "relianc",
+                "credibl",
+                "trust"
+            ],
+            "excluded_stems": []
+        }
+    ]
+}

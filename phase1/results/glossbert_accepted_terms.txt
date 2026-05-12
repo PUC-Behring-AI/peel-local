@@ -1,0 +1,42 @@
+word	stem	pos	count	definition
+experts	expert	NOUN	168	a person with special knowledge or ability who performs skillfully
+Expertise	expertis	PROPN	80	skillfulness by virtue of possessing special knowledge
+epistemic	epistem	ADJ	80	of or relating to epistemology
+conception	concept	NOUN	33	an abstract or general idea inferred or derived from specific instances
+knowledge	knowledg	NOUN	31	the psychological result of perception and learning and reasoning
+subject	subject	ADJ	27	possibly accepting or permitting
+way	way	NOUN	26	how something is done or how it happens
+based	base	VERB	23	use as a basis for; found on
+described	describ	VERB	23	give a description of
+insofar	insofar	ADV	22	to the degree or extent that
+analogous	analog	ADJ	19	similar or equivalent in some respects though otherwise dissimilar
+reliable	reliabl	ADJ	19	worthy of reliance or trust
+relationships	relationship	NOUN	18	a relation between people; (`relationship' is often used where `relation' would serve, as in `the relationship between inflation and unemployment', but the preferred usage of `relationship' is for human relations or states of relatedness)
+artefact	artefact	NOUN	18	a man-made object taken as a whole
+peer	peer	NOUN	17	a person who is of equal standing with another in a group
+literature	literatur	NOUN	15	creative writing of recognized artistic value
+explanation	explan	NOUN	15	a statement that makes something comprehensible by describing the relevant structure or operation or circumstances etc.
+course	cours	NOUN	15	education imparted in a series of lessons or meetings
+layperson	layperson	NOUN	14	someone who is not a clergyman or a professional person
+attributing	attribut	VERB	14	attribute or credit to
+ability	abil	NOUN	12	the quality of being able to perform; a quality that permits or facilitates achievement or accomplishment
+rely	reli	VERB	12	have confidence or faith in
+reliance	relianc	NOUN	12	certainty based on past experience
+discussed	discuss	VERB	12	to consider or examine in speech or writing
+causal	causal	ADJ	12	involving or constituting a cause; causing
+credibility	credibl	NOUN	12	the quality of being believable or trustworthy
+Goldman	goldman	PROPN	11	United States anarchist (born in Russia) who opposed conscription; was deported to the Soviet Union in 1919 (1869-1940)
+mobilised	mobilis	VERB	11	call to arms; of military personnel
+kind	kind	NOUN	11	a category of things distinguished by some common characteristic or quality
+algorithm	algorithm	NOUN	11	a precise rule (or set of rules) specifying how to solve some problem
+actual	actual	ADJ	11	presently existing in fact and not merely potential or possible
+extent	extent	NOUN	9	the point or degree to which something extends
+cognitive	cognit	ADJ	9	of or being or relating to or involving cognition
+frequently	frequent	ADV	9	many times at short intervals
+According	accord	VERB	9	go together
+views	view	NOUN	9	a way of regarding situations or topics etc.
+longer	longer	ADV	9	for more time
+competence	compet	NOUN	9	the quality of being adequately or well qualified physically and intellectually
+output	output	NOUN	16	final product; the things produced
+trust	trust	NOUN	105	certainty based on past experience
+systems	system	NOUN	123	element composed of a group of independent but interrelated elements
