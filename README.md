@@ -66,3 +66,8 @@ nltk.download("omw-1.4")
 ```
 
 ---
+
+## CUDA
+
+CUDA is required for efficient GPU processing. Guidelines below:
+- [CUDA INSTALLATION](https://developer.nvidia.com/cuda-downloads)
