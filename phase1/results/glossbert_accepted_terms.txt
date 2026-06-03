@@ -1,42 +1,149 @@
-word	stem	pos	count	definition
-experts	expert	NOUN	168	a person with special knowledge or ability who performs skillfully
-Expertise	expertis	PROPN	80	skillfulness by virtue of possessing special knowledge
-epistemic	epistem	ADJ	80	of or relating to epistemology
-conception	concept	NOUN	33	an abstract or general idea inferred or derived from specific instances
-knowledge	knowledg	NOUN	31	the psychological result of perception and learning and reasoning
-subject	subject	ADJ	27	possibly accepting or permitting
-way	way	NOUN	26	how something is done or how it happens
-based	base	VERB	23	use as a basis for; found on
-described	describ	VERB	23	give a description of
-insofar	insofar	ADV	22	to the degree or extent that
-analogous	analog	ADJ	19	similar or equivalent in some respects though otherwise dissimilar
-reliable	reliabl	ADJ	19	worthy of reliance or trust
-relationships	relationship	NOUN	18	a relation between people; (`relationship' is often used where `relation' would serve, as in `the relationship between inflation and unemployment', but the preferred usage of `relationship' is for human relations or states of relatedness)
-artefact	artefact	NOUN	18	a man-made object taken as a whole
-peer	peer	NOUN	17	a person who is of equal standing with another in a group
-literature	literatur	NOUN	15	creative writing of recognized artistic value
-explanation	explan	NOUN	15	a statement that makes something comprehensible by describing the relevant structure or operation or circumstances etc.
-course	cours	NOUN	15	education imparted in a series of lessons or meetings
-layperson	layperson	NOUN	14	someone who is not a clergyman or a professional person
-attributing	attribut	VERB	14	attribute or credit to
-ability	abil	NOUN	12	the quality of being able to perform; a quality that permits or facilitates achievement or accomplishment
-rely	reli	VERB	12	have confidence or faith in
-reliance	relianc	NOUN	12	certainty based on past experience
-discussed	discuss	VERB	12	to consider or examine in speech or writing
-causal	causal	ADJ	12	involving or constituting a cause; causing
-credibility	credibl	NOUN	12	the quality of being believable or trustworthy
-Goldman	goldman	PROPN	11	United States anarchist (born in Russia) who opposed conscription; was deported to the Soviet Union in 1919 (1869-1940)
-mobilised	mobilis	VERB	11	call to arms; of military personnel
-kind	kind	NOUN	11	a category of things distinguished by some common characteristic or quality
-algorithm	algorithm	NOUN	11	a precise rule (or set of rules) specifying how to solve some problem
-actual	actual	ADJ	11	presently existing in fact and not merely potential or possible
-extent	extent	NOUN	9	the point or degree to which something extends
-cognitive	cognit	ADJ	9	of or being or relating to or involving cognition
-frequently	frequent	ADV	9	many times at short intervals
-According	accord	VERB	9	go together
-views	view	NOUN	9	a way of regarding situations or topics etc.
-longer	longer	ADV	9	for more time
-competence	compet	NOUN	9	the quality of being adequately or well qualified physically and intellectually
-output	output	NOUN	16	final product; the things produced
-trust	trust	NOUN	105	certainty based on past experience
-systems	system	NOUN	123	element composed of a group of independent but interrelated elements
+stem	words	count	pos	definition
+expert	{'expert', 'experts'}	168	{'NOUN'}	{'a person with special knowledge or ability who performs skillfully'}
+human	{'humans', 'human'}	91	{'NOUN', 'ADJ'}	{'all of the living human inhabitants of the earth', 'characteristic of humanity'}
+expertis	{'expertise'}	80	{'NOUN', 'PROPN'}	{'skillfulness by virtue of possessing special knowledge'}
+epistem	{'epistemic'}	80	{'ADJ'}	{'of or relating to epistemology'}
+place	{'place', 'placed'}	40	{'VERB'}	{'put into a certain place or abstract location'}
+decis	{'decisions', 'decision'}	40	{'NOUN'}	{'the act of making up your mind about something'}
+knowledg	{'knowledge'}	31	{'NOUN'}	{'the psychological result of perception and learning and reasoning'}
+individu	{'individual', 'individuals'}	26	{'NOUN', 'ADJ'}	{'being or characteristic of a single thing or person', 'a human being'}
+hand	{'hand'}	25	{'NOUN'}	{'the (prehensile) extremity of the superior limb'}
+person	{'personal', 'person'}	25	{'NOUN', 'ADJ'}	{'concerning or affecting a particular person or his or her private life and personality', 'a human being'}
+base	{'based'}	23	{'VERB'}	{'use as a basis for; found on'}
+describ	{'described', 'describes'}	23	{'VERB'}	{'give a description of'}
+insofar	{'insofar'}	22	{'ADV'}	{'to the degree or extent that'}
+trustworthi	{'trustworthy', 'trustworthiness'}	21	{'NOUN', 'ADJ'}	{'worthy of trust or belief', 'the trait of deserving trust and confidence'}
+analog	{'analogous'}	19	{'ADJ'}	{'similar or equivalent in some respects though otherwise dissimilar'}
+reliabl	{'reliable', 'reliability'}	19	{'NOUN', 'ADJ'}	{'worthy of reliance or trust', 'the quality of being dependable or reliable'}
+artefact	{'artefacts', 'artefact'}	18	{'NOUN'}	{'a man-made object taken as a whole'}
+gener	{'generally', 'general'}	16	{'ADJ', 'ADV'}	{'usually; as a rule', 'applying to all or most members of a category or group'}
+literatur	{'literature'}	15	{'NOUN'}	{'creative writing of recognized artistic value'}
+explan	{'explanation'}	15	{'NOUN'}	{'a statement that makes something comprehensible by describing the relevant structure or operation or circumstances etc.'}
+note	{'notes', 'note', 'noted'}	15	{'VERB'}	{'make mention of'}
+layperson	{'layperson'}	14	{'NOUN', 'PROPN'}	{'someone who is not a clergyman or a professional person'}
+exampl	{'example', 'examples'}	14	{'NOUN'}	{'an item of information that is typical of a class or group'}
+attribut	{'attributed', 'attributing'}	14	{'VERB'}	{'attribute or credit to'}
+technolog	{'technologies', 'technology'}	13	{'NOUN'}	{'the practical application of science to commerce or industry'}
+abil	{'ability', 'abilities'}	12	{'NOUN'}	{'the quality of being able to perform; a quality that permits or facilitates achievement or accomplishment'}
+reli	{'rely'}	12	{'VERB'}	{'have confidence or faith in'}
+discuss	{'discussed', 'discussions', 'discussing'}	12	{'NOUN', 'VERB'}	{'an extended communication (often interactive) dealing with some particular topic', 'to consider or examine in speech or writing'}
+type	{'type', 'types'}	12	{'NOUN'}	{'a subdivision of a particular kind of thing'}
+causal	{'causal'}	12	{'ADJ'}	{'involving or constituting a cause; causing'}
+credibl	{'credibility'}	12	{'NOUN'}	{'the quality of being believable or trustworthy'}
+goldman	{'goldman'}	11	{'PROPN'}	{'United States anarchist (born in Russia) who opposed conscription; was deported to the Soviet Union in 1919 (1869-1940)'}
+kind	{'kind'}	11	{'NOUN'}	{'a category of things distinguished by some common characteristic or quality'}
+algorithm	{'algorithmic', 'algorithms', 'algorithm'}	11	{'NOUN', 'ADJ'}	{'a precise rule (or set of rules) specifying how to solve some problem', 'of or relating to or having the characteristics of an algorithm'}
+differ	{'differ', 'different'}	11	{'ADJ', 'VERB'}	{'be different', 'unlike in nature or quality or form or degree'}
+actual	{'actual', 'actually'}	11	{'ADJ', 'ADV'}	{'presently existing in fact and not merely potential or possible', 'in actual fact'}
+write	{'write', 'writing', 'writes'}	10	{'VERB'}	{'produce a literary work'}
+depend	{'depending', 'dependence'}	9	{'NOUN', 'VERB'}	{'the state of relying on or being controlled by someone or something else', 'be contingent upon (something that is elided)'}
+cognit	{'cognitive'}	9	{'ADJ'}	{'of or being or relating to or involving cognition'}
+frequent	{'frequently'}	9	{'ADV'}	{'many times at short intervals'}
+accord	{'according', 'accordance'}	9	{'NOUN', 'VERB'}	{'concurrence of opinion', 'go together'}
+view	{'views', 'view'}	9	{'NOUN'}	{'a way of regarding situations or topics etc.'}
+longer	{'longer'}	9	{'ADV'}	{'for more time'}
+author	{'authority', 'authors'}	9	{'NOUN'}	{'writes (books or stories or articles or the like) professionally (for pay)', 'the power or right to give orders or make decisions'}
+compet	{'competent', 'competence'}	9	{'NOUN', 'ADJ'}	{'properly or sufficiently qualified or capable or efficient', 'the quality of being adequately or well qualified physically and intellectually'}
+system	{'Systems', 'systems'}	123	{'NOUN'}	{'an organized structure for arranging or classifying', 'a group of independent but interrelated elements comprising a unified whole'}
+trust	{'trust'}	105	{'NOUN'}	{'complete confidence in a person or plan etc', 'the trait of believing in the honesty and reliability of others', 'certainty based on past experience'}
+opac	{'opacity'}	78	{'NOUN'}	{'the quality of being opaque to a degree; the degree to which something reduces the passage of light', 'incomprehensibility resulting from obscurity of meaning'}
+ai	{'AI'}	76	{'PROPN'}	{'the branch of computer science that deal with writing computer programs that can solve problems creatively', 'a sloth that has three long claws on each forefoot and each hindfoot'}
+reason	{'reason'}	57	{'NOUN'}	{'a justification for something existing or happening'}
+artifici	{'artificial'}	47	{'ADJ'}	{'artificially formal'}
+form	{'forms', 'form'}	42	{'NOUN'}	{'a category of things distinguished by some common characteristic or quality', 'a perceptual structure'}
+agent	{'agents', 'agent'}	41	{'NOUN'}	{'a substance that exerts some force or effect', 'a representative who acts on behalf of other persons or organizations'}
+action	{'action', 'actions'}	37	{'NOUN'}	{'the series of events that form a plot', 'the state of being active'}
+concept	{'conception'}	33	{'NOUN'}	{'the event that occurred at the beginning of something'}
+question	{'question', 'questions'}	30	{'NOUN'}	{'the subject matter at issue'}
+fact	{'fact'}	28	{'NOUN'}	{'a statement or assertion of verified information about something that is the case or has happened'}
+machin	{'machine'}	28	{'NOUN'}	{'an intricate organization that accomplishes its goals efficiently'}
+understand	{'understanding', 'understand'}	28	{'VERB'}	{'believe to be the case', 'make sense of a language'}
+subject	{'subject'}	27	{'ADJ'}	{'being under the power or sovereignty of another or others'}
+explain	{'explains'}	26	{'VERB'}	{'serve as a reason or cause or justification of'}
+sens	{'sense'}	26	{'NOUN'}	{'sound practical judgment', 'the meaning of a word or expression; the way in which a word or expression or situation can be interpreted'}
+way	{'way'}	26	{'NOUN'}	{'how a result is obtained or an end is achieved'}
+context	{'context', 'contexts'}	25	{'NOUN', 'PROPN'}	{'the set of facts or circumstances that surround a situation or event'}
+consid	{'consider'}	25	{'VERB'}	{'show consideration for; take into account'}
+judgement	{'judgements', 'judgement'}	25	{'NOUN'}	{'the capacity to assess situations or circumstances shrewdly and to draw sound conclusions'}
+use	{'use'}	24	{'VERB'}	{'avail oneself to'}
+certain	{'certain'}	24	{'ADJ'}	{'having or feeling no doubt or uncertainty; confident and assured'}
+point	{'pointed', 'points', 'point'}	24	{'NOUN', 'VERB'}	{'an isolated fact that is considered separately from the whole', 'a brief version of the essential meaning of something', 'be a signal for or a symptom of'}
+case	{'cases'}	24	{'NOUN'}	{'a special set of circumstances', 'a comprehensive term for any proceeding in a court of law whereby an individual seeks a legal remedy'}
+matter	{'matter'}	22	{'NOUN'}	{'some situation or event that is thought about'}
+relat	{'related'}	22	{'VERB'}	{'be relevant to'}
+follow	{'follows', 'Following', 'followed', 'following'}	22	{'VERB'}	{"act in accordance with someone's rules, commands, or wishes", 'be later in time', 'come as a logical consequence; follow logically'}
+ration	{'rational'}	21	{'ADJ'}	{'having its source in or being guided by the intellect (as distinguished from experience or emotion)'}
+particular	{'particular'}	21	{'ADJ'}	{'first and most important', 'separate and distinct from others of the same group or category'}
+characterist	{'characteristics', 'characteristic'}	20	{'NOUN'}	{'a distinguishing quality'}
+caus	{'Causes', 'causes', 'caused'}	20	{'NOUN', 'VERB'}	{'a justification for something existing or happening', 'a series of actions advancing a principle or tending toward a particular end', 'cause to do; cause to act in a specified manner'}
+moral	{'moral'}	20	{'ADJ'}	{'psychological rather than physical or tangible in effect'}
+charact	{'character'}	20	{'NOUN'}	{'the inherent complex of attributes that determines a persons moral and ethical actions and reactions; - Herbert Spencer', 'a characteristic property that defines the apparent individual nature of something'}
+present	{'presented', 'presentations'}	19	{'NOUN', 'VERB'}	{'introduce', 'a show or display; the act of presenting something to sight or view', 'bring forward and present to the mind'}
+al	{'al'}	19	{'PROPN'}	{'a state in the southeastern United States on the Gulf of Mexico; one of the Confederate states during the American Civil War'}
+process	{'processes'}	19	{'NOUN'}	{'(psychology) the performance of some composite cognitive activity; an operation that affects mental contents'}
+relationship	{'relationships', 'relationship'}	18	{'NOUN'}	{'(anthropology) relatedness or connection by blood or marriage or adoption', 'a state involving mutual dealings between people or parties or countries'}
+posit	{'positive'}	18	{'ADJ'}	{'involving advantage or good'}
+term	{'terms'}	18	{'NOUN'}	{'a word or expression used for some particular thing'}
+social	{'social'}	17	{'ADJ'}	{'relating to or belonging to or characteristic of high society'}
+refer	{'referring', 'referred'}	17	{'VERB'}	{'think of, regard, or classify under a subsuming principle or with a general group or in relation to another'}
+suggest	{'suggesting', 'suggests', 'suggested', 'suggest'}	17	{'VERB'}	{'suggest the necessity of an intervention; in medicine', 'call to mind', 'imply as a possibility'}
+peer	{'peers'}	17	{'NOUN'}	{'a nobleman (duke or marquis or earl or viscount or baron) who is a member of the British peerage'}
+output	{'outputs', 'output'}	16	{'NOUN'}	{'production of a certain amount'}
+norm	{'norm'}	16	{'NOUN'}	{'a statistic describing the location of a distribution'}
+dimens	{'dimensions', 'dimension'}	16	{'NOUN'}	{'a construct whereby objects or individuals can be distinguished'}
+abl	{'able'}	15	{'ADJ'}	{'have the skills and qualifications to do things well'}
+given	{'given'}	15	{'VERB'}	{'be the cause or source of'}
+opaqu	{'Opaque', 'opaque'}	15	{'ADJ'}	{'not clearly understood or expressed'}
+justifi	{'justified'}	15	{'VERB'}	{'defend, explain, clear away, or make excuses for by reasoning', 'show to be right by providing justification or proof'}
+cours	{'course'}	15	{'NOUN'}	{'a connected series of events or actions or developments'}
+field	{'fields', 'field'}	15	{'NOUN'}	{'a region where a battle is being (or has been) fought', 'a branch of knowledge'}
+possibl	{'possibility'}	15	{'NOUN'}	{'capability of existing or happening or being true', 'a tentative insight into the natural world; a concept that is not yet verified but that if true would explain certain facts or phenomena'}
+mention	{'mention', 'mentioned'}	14	{'VERB'}	{'commend', 'make mention of'}
+concern	{'concern'}	14	{'NOUN'}	{'a commercial or industrial enterprise and the people who constitute it'}
+varieti	{'varieties', 'variety'}	14	{'NOUN'}	{'a category of things distinguished by some common characteristic or quality'}
+make	{'making', 'make'}	14	{'VERB'}	{'cause to do; cause to act in a specified manner', 'give certain properties to something'}
+correct	{'correct', 'correctness'}	14	{'NOUN', 'ADJ'}	{'the quality of conformity to social expectations', 'socially right or correct'}
+object	{'objective'}	14	{'ADJ'}	{'belonging to immediate experience of actual things or events'}
+intellectu	{'intellectual'}	13	{'ADJ'}	{'involving intelligence rather than emotions or instinct', 'appealing to or using the intellect'}
+learn	{'learning'}	13	{'VERB'}	{'impart skills or knowledge to'}
+paper	{'paper'}	13	{'NOUN'}	{'a scholarly article describing the results of observations or stating hypotheses', 'an essay (especially one written as an assignment)', 'a daily or weekly publication on folded sheets; contains news and articles and advertisements'}
+respons	{'responsibility'}	13	{'NOUN'}	{'the proper sphere or extent of your activities', "a form of trustworthiness; the trait of being answerable to someone for something or being responsible for one's conduct"}
+specif	{'specific'}	13	{'ADJ'}	{'stated explicitly or in detail'}
+design	{'design', 'designates', 'designed'}	13	{'NOUN', 'VERB'}	{'plan something for a specific role or purpose or effect', 'make a design of; plan out in systematic, often graphic form', 'indicate a place, direction, person, or thing; either spatially or figuratively', 'a decorative or artistic work'}
+relianc	{'reliance'}	12	{'NOUN'}	{'the state of relying on something'}
+natur	{'nature'}	12	{'NOUN'}	{'a causal agent creating and controlling things in the universe'}
+expect	{'expectation', 'expects'}	12	{'NOUN', 'VERB'}	{'the feeling that something is about to happen', 'consider obligatory; request and expect'}
+defer	{'deference', 'deferring'}	11	{'NOUN', 'VERB'}	{"yield to another's wish or opinion", 'a disposition or tendency to yield to the will of others'}
+testimoni	{'testimony'}	11	{'NOUN'}	{'something that serves as evidence'}
+mobilis	{'mobilised'}	11	{'VERB'}	{'make ready for action or use'}
+observ	{'observation', 'observes'}	11	{'NOUN', 'VERB'}	{'the act of noticing or paying attention', 'a remark expressing careful consideration', 'make mention of'}
+precis	{'precisely'}	11	{'ADV'}	{'just as it should be', 'in a precise manner'}
+result	{'results'}	11	{'NOUN'}	{'a statement that solves a problem or explains how to solve the problem'}
+time	{'time', 'times'}	11	{'NOUN'}	{'an indefinite period (usually marked by specific attributes or activities)', 'a suitable moment', 'a period of time considered as a resource under your control and sufficient to accomplish something'}
+model	{'modelling', 'modelled'}	11	{'VERB'}	{'create a representation or model of'}
+similar	{'similar'}	11	{'ADJ'}	{'resembling or similar; having the same or some of the same characteristics; often used in combination', 'having the same or similar characteristics'}
+condit	{'condition', 'conditions', 'conditioned'}	11	{'NOUN', 'VERB'}	{'an assumption on which rests the validity or effect of something else', 'specify as a condition or requirement in a contract or agreement; make an express demand or provision in an agreement'}
+brain	{'brains', 'brain'}	11	{'NOUN'}	{"that which is responsible for one's thoughts and feelings; the seat of the faculty of reason", 'mental ability'}
+ross	{'Ross'}	10	{'PROPN'}	{'British explorer of the Arctic and Antarctic; located the north magnetic pole in 1831; discovered the Ross Sea in Antarctica; nephew of Sir John Ross (1800-1862)', 'British physician who discovered that mosquitos transmit malaria (1857-1932)'}
+regard	{'regard'}	10	{'NOUN'}	{'the condition of being honored (esteemed or respected or well regarded)'}
+let	{'let', 'Let'}	10	{'VERB'}	{'cause to move; cause to be in a certain position or condition'}
+distinct	{'distinction', 'distinctions'}	10	{'NOUN'}	{'a distinguishing quality'}
+find	{'find'}	10	{'VERB'}	{'establish after a calculation, investigation, experiment, survey, or study'}
+oper	{'operations'}	10	{'NOUN'}	{'a business especially one run on a large scale'}
+simpli	{'simply'}	10	{'ADV'}	{'absolutely; altogether; really'}
+extent	{'extent'}	9	{'NOUN'}	{'the distance or area or volume over which something extends'}
+notion	{'notion'}	9	{'NOUN'}	{'an odd or fanciful or capricious idea', 'a general inclusive concept'}
+number	{'number'}	9	{'NOUN'}	{'a concept of quantity involving zero and units'}
+deep	{'deep'}	9	{'ADJ'}	{'having great spatial extension or penetration downward or inward from an outer surface or backward or laterally or outward from a center; sometimes used in combination', 'marked by depth of thinking'}
+program	{'programs'}	9	{'NOUN'}	{'a system of projects or services intended to meet a public need'}
+carri	{'carry', 'carrying', 'carried'}	9	{'VERB'}	{"have with oneself; have on one's person", 'transmit or serve as the medium for transmission', 'serve as a means for expressing something'}
+possess	{'possess'}	9	{'VERB'}	{'enter into and control, as of emotions or ideas'}
+distinguish	{'distinguish', 'distinguishes'}	9	{'VERB'}	{'make conspicuous or noteworthy', 'detect with the senses'}
+word	{'words'}	9	{'NOUN'}	{'an angry dispute', 'the text of a popular song or musical-comedy number'}
+account	{'account', 'accounts'}	9	{'NOUN'}	{'a statement that makes something comprehensible by describing the relevant structure or operation or circumstances etc.'}
+instrument	{'instruments'}	9	{'NOUN'}	{'the semantic role of the entity (usually inanimate) that the agent uses to perform an action or start a process', 'the means whereby some act is accomplished', 'a person used by another to gain an end'}
+aspect	{'aspects', 'aspect'}	9	{'NOUN'}	{'the beginning or duration or completion or repetition of the action of a verb', 'a characteristic to be considered'}
+studi	{'study', 'studies'}	9	{'NOUN', 'VERB'}	{'applying the mind to learning and understanding a subject (especially by reading)', 'give careful consideration to'}
+peopl	{'people'}	9	{'NOUN'}	{'the body of citizens of a state or country', 'the common people generally'}
+forward	{'forward'}	9	{'ADV'}	{'toward the future; forward in time', 'forward in time or order or degree', 'in a forward direction'}
+act	{'acts', 'act'}	9	{'VERB'}	{'play a role or part', 'behave in a certain manner; show a certain behavior; conduct or comport oneself', 'pretend to have certain qualities or state of mind', "discharge one's duties"}
