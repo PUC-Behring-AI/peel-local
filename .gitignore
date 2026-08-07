@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+
+.ipynb_checkpoints/
+
+# GlossBERT is now fetched from the Hugging Face Hub (jvomiranda/GlossBERT_Checkpoint);
+# a local checkpoint folder is no longer required. Ignored defensively in case one is
+# kept around for offline use.
+GlossBERT_Checkpoint/
+**/GlossBERT_Checkpoint/
+
+# Generated/corpus-specific artifacts -- no exceptions. Example corpora
+# (Boisseau, etc.) and their outputs are local-only, not committed.
+data/
+
+.DS_Store
+Thumbs.db

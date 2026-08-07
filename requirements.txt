@@ -1,0 +1,38 @@
+# PEEL-Local dependencies. Install with: pip install -r requirements.txt
+#
+# Not covered here (separate steps, see README.md "Installation"):
+#   - the spaCy language model:  python -m spacy download en_core_web_sm
+#   - NLTK corpora (wordnet, omw-1.4): downloaded automatically on first
+#     run, or via nltk.download("wordnet") / nltk.download("omw-1.4")
+#   - Ollama itself (https://ollama.com), required for Phase 2 condensation
+#     and the web interface -- not a pip package
+
+# CUDA-enabled torch build (CUDA 13.0 wheels). This applies to the whole
+# `pip install -r requirements.txt` run -- pip still uses PyPI first for
+# every other package, and only falls back to this index for the ones
+# (torch) that resolve there. If you don't have a CUDA 13.0-compatible
+# GPU/driver, delete this line and `pip install torch` normally instead --
+# Phase 1 falls back to CPU automatically either way, just slower. For a
+# different CUDA version, swap "cu130" for the matching build listed at
+# https://pytorch.org/get-started/locally/.
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+# Core NLP
+spacy
+nltk
+
+# Word Sense Disambiguation (Phase 1)
+torch  # installed from the CUDA index above
+transformers
+
+# Semantic embeddings + clustering (Phase 1)
+sentence-transformers
+hdbscan
+
+# General
+numpy
+tqdm
+requests
+
+# Web interface (webapp/)
+flask

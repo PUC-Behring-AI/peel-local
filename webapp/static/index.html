@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEEL-Local</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>PEEL-Local</h1>
+  <p>Interactive pipeline: Phase 0 (optional) &rarr; Phase 1 &rarr; Phase 2 &rarr; Voyant + standalone export.
+     See <a href="../RUN_PIPELINE_GUIDE.md" target="_blank">RUN_PIPELINE_GUIDE.md</a> for the CLI equivalent.</p>
+</header>
+
+<main>
+
+  <!-- ============================================================ -->
+  <!-- SETUP -->
+  <!-- ============================================================ -->
+  <section id="screen-setup" class="screen">
+    <h2>1. Start a new run</h2>
+    <form id="setup-form">
+      <div class="field">
+        <label for="corpus_name">Corpus name</label>
+        <input type="text" id="corpus_name" name="corpus_name" placeholder="e.g. Boisseau" required
+               pattern="[A-Za-z0-9_-]+" title="Letters, digits, - and _ only">
+        <p class="hint">Used for <code>data/&lt;corpus_name&gt;/</code> -- letters, digits, <code>-</code> and <code>_</code> only.</p>
+      </div>
+
+      <div class="field">
+        <label for="file">Corpus text file (.txt)</label>
+        <input type="file" id="file" name="file" accept=".txt" required>
+      </div>
+
+      <div class="field checkbox-field">
+        <label><input type="checkbox" id="clean" name="clean"> Clean with Phase 0 before analysis</label>
+        <p class="hint">Removes page numbers, headers/footers, footnote digits, front matter, and end sections.</p>
+      </div>
+
+      <details class="advanced">
+        <summary>Advanced settings (Phase 1 tuning)</summary>
+        <div class="grid">
+          <div class="field">
+            <label for="top_percentile">Top percentile</label>
+            <input type="number" id="top_percentile" name="top_percentile" value="0.50" step="0.01" min="0.01" max="1">
+            <p class="hint">Fraction of most-frequent stems to consider.</p>
+          </div>
+          <div class="field">
+            <label for="max_stems">Max stems</label>
+            <input type="number" id="max_stems" name="max_stems" value="150" step="1" min="1">
+          </div>
+          <div class="field">
+            <label for="max_sentences_per_stem">Max sentences per stem</label>
+            <input type="number" id="max_sentences_per_stem" name="max_sentences_per_stem" value="5" step="1" min="1">
+          </div>
+          <div class="field">
+            <label for="max_synsets">Max synsets</label>
+            <input type="number" id="max_synsets" name="max_synsets" value="5" step="1" min="1">
+          </div>
+          <div class="field">
+            <label for="max_cluster_size">Max cluster size</label>
+            <input type="number" id="max_cluster_size" name="max_cluster_size" value="10" step="1" min="1">
+          </div>
+          <div class="field">
+            <label for="min_clusters">Min clusters (HDBSCAN)</label>
+            <input type="number" id="min_clusters" name="min_clusters" value="5" step="1" min="2">
+          </div>
+          <div class="field">
+            <label for="min_cluster_len">Min cluster length</label>
+            <input type="number" id="min_cluster_len" name="min_cluster_len" value="3" step="1" min="1">
+          </div>
+          <div class="field">
+            <label for="glossbert_model">GlossBERT model</label>
+            <input type="text" id="glossbert_model" name="glossbert_model" value="jvomiranda/GlossBERT_Checkpoint">
+          </div>
+          <div class="field">
+            <label for="lang_model">spaCy language model</label>
+            <input type="text" id="lang_model" name="lang_model" value="en_core_web_sm">
+          </div>
+          <div class="field">
+            <label for="sentence_embedder">Sentence embedder</label>
+            <input type="text" id="sentence_embedder" name="sentence_embedder" value="all-MiniLM-L6-v2">
+          </div>
+        </div>
+      </details>
+
+      <button type="submit" class="primary">Start</button>
+    </form>
+    <p id="setup-error" class="error-text hidden"></p>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PROGRESS / LOG -->
+  <!-- ============================================================ -->
+  <section id="screen-progress" class="screen hidden">
+    <h2>Working&hellip;</h2>
+    <p id="step-label" class="step-label"></p>
+    <pre id="log-box" class="log-box"></pre>
+    <pre id="error-box" class="error-box hidden"></pre>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FLAGGED TERM REVIEW -->
+  <!-- ============================================================ -->
+  <section id="screen-flagged-terms" class="screen hidden">
+    <h2>Flagged term review</h2>
+    <p class="hint">GlossBERT's predicted sense disagreed with WordNet's default for these terms.
+       Choose which definition to accept for each, or use the quick action below.</p>
+    <button type="button" id="accept-all-predicted" class="secondary">Use predicted definition for all</button>
+    <button type="button" class="primary submit-flagged-terms">Submit decisions</button>
+    <div id="flagged-terms-list"></div>
+    <button type="button" class="primary submit-flagged-terms">Submit decisions</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- CLUSTER REVIEW -->
+  <!-- ============================================================ -->
+  <section id="screen-cluster-review" class="screen hidden">
+    <h2>Cluster review</h2>
+    <p class="hint">Uncheck a stem or n-gram to remove it from its cluster, or use a cluster's "remove all
+       stems"/"remove all n-grams" button. Rename a cluster by editing its name. Removed stems can also be
+       excluded globally (added to <code>excList</code>).</p>
+    <button type="button" class="primary submit-cluster-review">Submit decisions</button>
+    <div id="cluster-review-list"></div>
+    <button type="button" class="primary submit-cluster-review">Submit decisions</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- VOYANT SETTINGS -->
+  <!-- ============================================================ -->
+  <section id="screen-voyant-settings" class="screen hidden">
+    <h2>Voyant settings</h2>
+    <p id="voyant-summary" class="hint"></p>
+    <form id="voyant-form">
+      <div class="field">
+        <label for="corpus_id">Voyant corpus ID</label>
+        <input type="text" id="corpus_id" name="corpus_id" placeholder="leave blank if not uploaded to Voyant yet">
+      </div>
+      <div class="field">
+        <label>Use Voyant <code>en_smart</code> stopword list?</label>
+        <div class="yesno">
+          <button type="button" class="yesno-btn" data-value="true">Yes</button>
+          <button type="button" class="yesno-btn selected" data-value="false">No</button>
+        </div>
+        <input type="hidden" id="use_smart_stopwords" value="false">
+      </div>
+      <button type="submit" class="primary">Finish Phase 1 &amp; continue</button>
+    </form>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PHASE 2 SETUP -->
+  <!-- ============================================================ -->
+  <section id="screen-phase2-setup" class="screen hidden">
+    <h2>Phase 2: sentence selection &amp; condensation</h2>
+    <p id="phase2-summary" class="hint"></p>
+    <form id="phase2-form">
+      <div class="grid">
+        <div class="field">
+          <label for="top_n">Sentences kept per cluster</label>
+          <input type="number" id="top_n" name="top_n" value="10" step="1" min="1">
+        </div>
+        <div class="field">
+          <label for="density_percentile">Lexical density percentile</label>
+          <input type="number" id="density_percentile" name="density_percentile" value="75" step="1" min="1" max="99">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Generate a condensation?</label>
+        <div class="yesno">
+          <button type="button" class="yesno-btn selected" data-target="run_condensation" data-value="true">Yes</button>
+          <button type="button" class="yesno-btn" data-target="run_condensation" data-value="false">No</button>
+        </div>
+        <input type="hidden" id="run_condensation" value="true">
+      </div>
+
+      <div id="condensation-fields">
+        <div class="field">
+          <label for="rates">Condensation rate(s), % (comma-separated)</label>
+          <input type="text" id="rates" name="rates" value="10" placeholder="e.g. 10,20">
+        </div>
+        <div class="field">
+          <label for="ollama_model">Ollama model
+            <button type="button" id="refresh-models" class="link-btn">refresh</button>
+          </label>
+          <select id="ollama_model" name="ollama_model"></select>
+          <p id="ollama-status" class="hint"></p>
+        </div>
+        <div class="field">
+          <label for="max_trials">Max generation trials before asking to escalate</label>
+          <input type="number" id="max_trials" name="max_trials" value="3" step="1" min="1">
+        </div>
+      </div>
+
+      <button type="submit" class="primary">Run Phase 2</button>
+    </form>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- ESCALATION -->
+  <!-- ============================================================ -->
+  <section id="screen-escalation" class="screen hidden">
+    <h2>Condensation escalation</h2>
+    <p class="hint">These rates didn't hit their target word count within the trial limit.
+       Retry with the full source text included in the prompt?</p>
+    <button type="button" class="primary submit-escalation">Submit decisions</button>
+    <div id="escalation-list"></div>
+    <button type="button" class="primary submit-escalation">Submit decisions</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- INJECTION REVIEW -->
+  <!-- ============================================================ -->
+  <section id="screen-injection-review" class="screen hidden">
+    <h2>Borderline classification review</h2>
+    <p class="hint">These spans were classified F/T but look denser than that type's own definition allows.
+       Keep the classification, or reassign it.</p>
+    <button type="button" class="primary submit-injection-review">Submit decisions</button>
+    <div id="injection-review-list"></div>
+    <button type="button" class="primary submit-injection-review">Submit decisions</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- COMPLETE -->
+  <!-- ============================================================ -->
+  <section id="screen-complete" class="screen hidden">
+    <h2>Pipeline complete</h2>
+    <p id="complete-summary"></p>
+    <div id="complete-files"></div>
+
+    <div class="card" id="regenerate-panel">
+      <h3>Regenerate a condensation</h3>
+      <p class="hint">
+        Redo one rate's condensation -- optionally at a different target
+        rate, optionally with the default prompt edited by hand. Redoing
+        an existing rate overwrites its outputs; a new rate is added
+        alongside the rest.
+      </p>
+      <div class="field">
+        <label for="regen-rate">Rate to (re)generate (%)</label>
+        <input type="number" id="regen-rate" min="1" max="100" step="1">
+        <p class="hint" id="regen-existing-rates"></p>
+      </div>
+      <button type="button" id="regen-preview-prompt" class="secondary">Preview / edit default prompt</button>
+      <div class="field hidden" id="regen-prompt-field">
+        <label for="regen-prompt">Prompt sent to the LLM (edit freely, or leave as-is)</label>
+        <textarea id="regen-prompt" rows="16"></textarea>
+      </div>
+      <button type="button" id="regen-submit" class="primary">Regenerate</button>
+    </div>
+
+    <button type="button" id="start-new-run" class="secondary">Start another run</button>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
