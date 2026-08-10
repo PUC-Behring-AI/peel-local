@@ -58,6 +58,7 @@
           <div class="field">
             <label for="max_synsets">Max synsets</label>
             <input type="number" id="max_synsets" name="max_synsets" value="5" step="1" min="1">
+            <p class="hint">A ceiling, not a guarantee: this many candidate definitions are shown per flagged word <em>at most</em>. WordNet's actual sense count varies a lot by word and part of speech (e.g. "call" as a verb has 28 senses, but "human" as an adjective has only 3) -- a flagged word with few senses for its part of speech will show fewer candidates than this, no matter how high you set it.</p>
           </div>
           <div class="field">
             <label for="max_cluster_size">Max cluster size</label>
@@ -192,6 +193,25 @@
         <div class="field">
           <label for="max_trials">Max generation trials before asking to escalate</label>
           <input type="number" id="max_trials" name="max_trials" value="3" step="1" min="1">
+        </div>
+
+        <div class="field checkbox-field">
+          <label><input type="checkbox" id="auto_detect_metadata"> Let the LLM determine the source's title/author(s)/date</label>
+          <p class="hint">Retrieval-augmented: retrieves the source passages most likely to contain this information and asks the model to extract it. Any field it isn't confident about comes back "Unclear".</p>
+        </div>
+        <div id="metadata-fields" class="grid">
+          <div class="field">
+            <label for="source_title">Source title</label>
+            <input type="text" id="source_title" name="title" placeholder="leave blank for Unclear">
+          </div>
+          <div class="field">
+            <label for="source_authors">Source author(s)</label>
+            <input type="text" id="source_authors" name="authors" placeholder="leave blank for Unclear">
+          </div>
+          <div class="field">
+            <label for="source_date">Source date</label>
+            <input type="text" id="source_date" name="date" placeholder="leave blank for Unclear">
+          </div>
         </div>
       </div>
 

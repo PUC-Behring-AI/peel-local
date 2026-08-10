@@ -100,10 +100,15 @@ S = {
 # ============================================================
 # STRUCTURAL BLOCK PARSER
 # ============================================================
-# Heuristic and corpus-format-dependent: the positional author-line
-# fallback (line right after the title) assumes a single author line with
-# no subtitle/abstract between it and the title. Not verified against
-# every possible condensation layout.
+# No longer guesses at a title/author line from the condensed text's first
+# two lines -- that positional heuristic ("first line = title, next =
+# author") was fragile in practice: a condensation that doesn't open with
+# a literal one-line title (the normal case -- build_condensation_prompt
+# never asks the model for one) had its real opening paragraph(s)
+# misdetected as "h1"/"authors" instead. The report's title/author/date
+# now come from an explicit, separately-collected value (see
+# run_source_metadata_setup/extract_source_metadata) -- every line here is
+# ordinary body content.
 
 _RE_H2 = re.compile(r"^\s*(\d)\.?\s*[\t ]+(.+)$")        # "1\tIntroduction" or "1. Introduction"
 _RE_H3 = re.compile(r"^\s*(\d+\.\d+)\.?\s*[\t ]+(.+)$")  # "2.1\tTitle" or "2.1. Title"
@@ -112,11 +117,10 @@ _RE_DEFN = re.compile(r"^\s*Definition \d")
 
 def parse_condensed_blocks(condensed_text):
     """Returns a list of (block_type, text) tuples.
-    block_type in {'h1', 'authors', 'h2', 'h3', 'defn', 'p'}."""
+    block_type in {'h2', 'h3', 'defn', 'p'}."""
     lines = condensed_text.split("\n")
     blocks = []
     buf = []
-    seen_h1 = False
 
     def flush():
         if buf:
@@ -127,13 +131,6 @@ def parse_condensed_blocks(condensed_text):
         stripped = line.strip()
         if not stripped:
             flush()
-            continue
-        if not seen_h1:
-            blocks.append(("h1", stripped))
-            seen_h1 = True
-            continue
-        if blocks and blocks[-1][0] == "h1" and not any(b[0] == "authors" for b in blocks):
-            blocks.append(("authors", stripped))
             continue
         if _RE_DEFN.match(line):
             flush()
@@ -175,12 +172,27 @@ def render_spans(block_text, all_spans):
     return html_text
 
 
-def render_c_toggle(span_id, source_texts):
-    items = "".join(f'<p style="margin:0 0 0.3rem">{esc(s)}</p>' for s in source_texts)
+def render_c_toggle(span_id, source_texts, max_shown=5):
+    """Shows up to max_shown source sentences directly; any remainder is
+    tucked behind a second, nested native <details> "Show N more" toggle
+    (same no-<script> disclosure pattern as the outer one, just nested),
+    since C spans can now trace to more than one contributing source."""
+    shown, extra = source_texts[:max_shown], source_texts[max_shown:]
+    items = "".join(f'<p style="margin:0 0 0.3rem">{esc(s)}</p>' for s in shown)
+
+    more = ""
+    if extra:
+        extra_items = "".join(f'<p style="margin:0 0 0.3rem">{esc(s)}</p>' for s in extra)
+        more = (
+            f'<details style="{S["c_details"]}">'
+            f'<summary style="{S["c_summary"]}">Show {len(extra)} more source(s)</summary>'
+            f'<div style="{S["c_inset"]}">{extra_items}</div></details>'
+        )
+
     return (
         f'<details style="{S["c_details"]}">'
         f'<summary style="{S["c_summary"]}">Show source (ᶜ{esc(span_id)})</summary>'
-        f'<div style="{S["c_inset"]}">{items}</div></details>'
+        f'<div style="{S["c_inset"]}">{items}{more}</div></details>'
     )
 
 
@@ -246,12 +258,15 @@ def build_meta_legend(corpus_name, source_word_count, rate, condensed_word_count
 <div style="{S['legend']}">
   <span style="{S['sw']}background:rgba(42,125,58,0.85)">&nbsp;</span>
   <b>F &mdash; Framing</b>&nbsp;
-  Pure connective/discourse-adverb fragment (&le;4 words), no propositional content.
+  Whole sentence otherwise matches a source sentence; the only difference
+  is &le;4 inserted/changed tokens, all purely connective (or, absent any
+  source match, a freestanding connective fragment on its own).
   <em>Low epistemic risk.</em> &nbsp;&nbsp;&nbsp;
   <span style="{S['sw']}background:rgba(70,130,180,0.85);border-bottom:1px dotted #2f5d80">&nbsp;</span>
   <b>T &mdash; Transition</b>&nbsp;
-  Metalinguistic sentence about the text's argument or structure, or any
-  other short (&le;6-word) span too brief to reliably score as paraphrase or compression.
+  Metalinguistic sentence about the text's argument or structure, or a
+  whole sentence that otherwise matches a source sentence with &le;6
+  inserted/changed tokens that include genuine (non-connective) content.
   <em>Medium risk.</em> &nbsp;&nbsp;&nbsp;
   <span style="{S['sw']}background:rgba(212,160,23,0.85);border-bottom:1px dashed #8a6810">&nbsp;</span>
   <b>R &mdash; Reformulation</b>&nbsp;
@@ -263,7 +278,13 @@ def build_meta_legend(corpus_name, source_word_count, rate, condensed_word_count
   Multiple source sentences collapsed. Click "Show source"
   directly below to reveal the passage it compresses &mdash; collapsed by
   default, one click to open, no JS.
-  <em>High risk.</em>
+  <em>High risk.</em> &nbsp;&nbsp;&nbsp;
+  <span style="{S['sw']}background:transparent;border:1px solid #bbb">&nbsp;</span>
+  <b>Unhighlighted text</b>&nbsp;
+  Verbatim from the source, word for word -- the taxonomy only classifies
+  non-verbatim spans, so nothing here has been added, reworded, or
+  compressed.
+  <em>Minimal risk.</em>
 </div>
 <p style="font-size:0.7rem;color:#999;font-family:system-ui,sans-serif;margin:0.3rem 0 0;">Classification is heuristic, not LLM-judged -- see the borderline flags and human report for disclosed uncertainty.</p>
 <hr style="{S['hr']}">
@@ -309,14 +330,16 @@ def build_coverage_table(coverage_report):
 # ============================================================
 
 def build_condensation_fragment(condensed_text, all_spans, source_sentences, coverage_report,
-                                 corpus_name, rate, source_word_count, phase1_json_name):
+                                 corpus_name, rate, source_word_count, phase1_json_name,
+                                 title=None, authors=None, date=None):
+    """title/authors/date: the source document's own metadata, collected
+    explicitly (typed in, or LLM-extracted -- see
+    run_source_metadata_setup/extract_source_metadata), not guessed from
+    the condensed text. Optional so existing callers (e.g. phase2.ipynb)
+    keep working unmodified, falling back to corpus_name with no byline."""
     blocks = parse_condensed_blocks(condensed_text)
 
-    h1_text = next((t for bt, t in blocks if bt == "h1"), corpus_name)
-    authors_text = next((t for bt, t in blocks if bt == "authors"), "")
-    body_blocks = [(bt, t) for bt, t in blocks if bt not in ("h1", "authors")]
-
-    section_blocks = _render_blocks_with_toggles(body_blocks, all_spans, source_sentences)
+    section_blocks = _render_blocks_with_toggles(blocks, all_spans, source_sentences)
     span_counts = Counter(s["type"] for s in all_spans)
     meta_legend = build_meta_legend(
         corpus_name, source_word_count, rate, len(condensed_text.split()),
@@ -324,10 +347,13 @@ def build_condensation_fragment(condensed_text, all_spans, source_sentences, cov
     )
     cov_table = build_coverage_table(coverage_report)
 
+    title_text = title or corpus_name
+    byline_text = " &middot; ".join(esc(v) for v in (authors, date) if v and v != "Unclear")
+
     return f"""<div style="{S['wrap']}">
-<h1 style="{S['h1']}">{esc(h1_text)}</h1>
-<p style="{S['authors']}">{esc(authors_text)}</p>
 {meta_legend}
+<h1 style="{S['h1']}">{esc(title_text)}</h1>
+<p style="{S['authors']}">{byline_text}</p>
 {section_blocks}
 {cov_table}
 </div>"""
@@ -344,7 +370,7 @@ def build_standalone_preview(fragment_html, corpus_name):
 
 
 def build_human_report(all_spans, borderline_flags, coverage_report,
-                        verbatim_overlap_pct, non_injected_pct):
+                        verbatim_overlap_pct, non_injected_pct, sanity_issues=None):
     span_counts = Counter(s["type"] for s in all_spans)
     lines = [
         "PEEL-Local Phase 2 Condensation -- Verification Report",
@@ -355,8 +381,15 @@ def build_human_report(all_spans, borderline_flags, coverage_report,
         f"Non-injected (word share outside classified spans): {non_injected_pct}%",
         f"Independent verbatim-overlap scan: {verbatim_overlap_pct}%",
         "",
-        "Borderline classification flags:",
+        "Generation sanity checks (invented vocabulary, runaway tokens, repetition loops):",
     ]
+    if not sanity_issues:
+        lines.append("  none")
+    else:
+        for issue in sanity_issues:
+            lines.append(f"  - {issue}")
+
+    lines += ["", "Borderline classification flags:"]
     if not borderline_flags:
         lines.append("  none")
     else:

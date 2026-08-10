@@ -415,7 +415,8 @@ class PipelineSession:
     # ------------------------------------------------------------
 
     def apply_phase2_setup(self, top_n, density_percentile, run_condensation,
-                            rates_str, ollama_model, max_trials):
+                            rates_str, ollama_model, max_trials,
+                            title="", authors="", date="", auto_detect_metadata=False):
         self.decisions2.record(
             step="phase2_setup", decision_type="sentence_selection_config",
             prompt="Phase 2 sentence-selection config",
@@ -427,6 +428,10 @@ class PipelineSession:
         self.density_percentile = density_percentile
         self.run_condensation = run_condensation
         self.rates = []
+        self._metadata_title = title.strip()
+        self._metadata_authors = authors.strip()
+        self._metadata_date = date.strip()
+        self._auto_detect_metadata = auto_detect_metadata
 
         if run_condensation:
             self.rates = [int(r.strip()) for r in rates_str.split(",") if r.strip()]
@@ -447,6 +452,13 @@ class PipelineSession:
                 step="condensation_setup", decision_type="max_trials_choice",
                 prompt="How many generation trials before asking to escalate?",
                 choice=str(max_trials), extra={"source": "web"},
+            )
+            self.decisions2.record(
+                step="source_metadata", decision_type="mode_choice",
+                prompt="Enter title/author(s)/date manually, or let the LLM determine them?",
+                choice="auto" if auto_detect_metadata else "manual",
+                extra={"source": "web", "title": self._metadata_title,
+                       "authors": self._metadata_authors, "date": self._metadata_date},
             )
 
         self._run_bg(self._step_select_sentences_and_generate, "Selecting informative sentences")
@@ -480,6 +492,21 @@ class PipelineSession:
             print("Pipeline complete (no condensation requested).")
             return None
 
+        if self._auto_detect_metadata:
+            print("\nExtracting title/author(s)/date from the source text...")
+            self.title, self.authors, self.date = condense.extract_source_metadata(self.text, self.ollama_model)
+            print(f"  Title: {self.title}\n  Author(s): {self.authors}\n  Date: {self.date}")
+        else:
+            self.title = self._metadata_title or "Unclear"
+            self.authors = self._metadata_authors or "Unclear"
+            self.date = self._metadata_date or "Unclear"
+        self.decisions2.record(
+            step="source_metadata", decision_type="metadata_result",
+            prompt="Source title/author(s)/date",
+            choice="auto" if self._auto_detect_metadata else "manual",
+            extra={"source": "web", "title": self.title, "authors": self.authors, "date": self.date},
+        )
+
         self.ordered_sentences = condense.gather_ordered_informative_sentences(self.enriched_state)
         self.cluster_key_terms = condense.gather_cluster_key_terms(self.enriched_state)
 
@@ -497,8 +524,7 @@ class PipelineSession:
                 model=self.ollama_model, max_trials=self.max_trials, include_full_text=False,
             )
             for t in result["trials"]:
-                print(f"  trial {t['trial']}: {t['word_count']} words "
-                      f"({'OK' if t['within_tolerance'] else 'outside tolerance'})")
+                print(condense.format_trial_line(t))
                 self.decisions2.record(
                     step="condensation_generation", decision_type="trial_result",
                     prompt="Condensation generation trial",
@@ -548,8 +574,7 @@ class PipelineSession:
                 source_text=self.text,
             )
             for t in result["trials"]:
-                print(f"  [escalated] trial {t['trial']}: {t['word_count']} words "
-                      f"({'OK' if t['within_tolerance'] else 'outside tolerance'})")
+                print(condense.format_trial_line(t, prefix="[escalated] "))
                 self.decisions2.record(
                     step="condensation_generation", decision_type="trial_result",
                     prompt="Condensation generation trial (escalated)",
@@ -558,7 +583,9 @@ class PipelineSession:
 
             if result["text"] is not None:
                 self.condensed_texts[rate] = result["text"]
-                if not result["success"]:
+                if result.get("sanity_failed"):
+                    print(f"\n{rate}%: no escalated trial passed the sanity checks -- using the closest one anyway, flag it for a manual look.")
+                elif not result["success"]:
                     print(f"\n{rate}%: no escalated trial hit tolerance -- using the closest one instead of discarding it.")
             else:
                 print(f"\nGiving up on {rate}% after escalation -- no condensation within tolerance.")
@@ -632,7 +659,7 @@ class PipelineSession:
         ever called -- either just-created by the caller, or from the
         first completed build, for regeneration)."""
         result = self.injection_results[rate]
-        coverage = condense.compute_cluster_coverage(self.phase1_state, condensed_text, self.stemmer)
+        coverage = condense.compute_cluster_coverage(self.phase1_state, condensed_text, self.text, self.stemmer)
         self.coverage_results[rate] = coverage
 
         fragment = condensation_report.build_condensation_fragment(
@@ -640,13 +667,15 @@ class PipelineSession:
             corpus_name=self.corpus_name, rate=rate,
             source_word_count=condense.count_words(self.text),
             phase1_json_name=self.paths.phase1_state_json().name,
+            title=self.title, authors=self.authors, date=self.date,
         )
         self.fragments_by_rate[rate] = fragment
 
         preview = condensation_report.build_standalone_preview(fragment, self.corpus_name)
+        sanity_issues = condense.check_condensation_sanity(condensed_text, self.ordered_sentences)
         human_report = condensation_report.build_human_report(
             result["all_spans"], result["borderline_flags"], coverage,
-            result["stats"]["verbatim_overlap_pct"], result["stats"]["non_injected_pct"],
+            result["stats"]["verbatim_overlap_pct"], result["stats"]["non_injected_pct"], sanity_issues,
         )
         blocks = condensation_report.parse_condensed_blocks(condensed_text)
         plain_summary = condensation_report.build_plain_summary(blocks)
@@ -743,8 +772,7 @@ class PipelineSession:
             prompt_override=self._regen_prompt_override,
         )
         for t in result["trials"]:
-            print(f"  trial {t['trial']}: {t['word_count']} words "
-                  f"({'OK' if t['within_tolerance'] else 'outside tolerance'})")
+            print(condense.format_trial_line(t))
             self.decisions2.record(
                 step="condensation_regeneration", decision_type="trial_result",
                 prompt="Condensation regeneration trial",
@@ -756,7 +784,9 @@ class PipelineSession:
                   "Previous outputs for this rate, if any, are unchanged.")
             self._regen_rate = None
             return None
-        if not result["success"]:
+        if result.get("sanity_failed"):
+            print(f"\n{rate}%: no trial passed the sanity checks -- using the closest trial by word count anyway, flag it for a manual look.")
+        elif not result["success"]:
             note = "using the closest trial instead of discarding it" if result["soft_accept"] else "no valid trial"
             print(f"\n{rate}%: no trial hit the target word count within tolerance -- {note}.")
 

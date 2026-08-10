@@ -254,10 +254,28 @@ the config cell checks for it and lists installed models.
 
 **Generation**: you're prompted for one or more target rates (5-30% of
 the source word count), an Ollama model name, and a maximum number of
-generation trials. Each trial's word count is checked against the target
-(±5% tolerance); if every trial misses, you're asked whether to retry
-with the full source text included in the prompt (not just the
-informative sentences and cluster terms).
+generation trials. Generation always runs with `repeat_penalty: 1.0`
+(Ollama's neutral value), so no implicit anti-repetition bias from the
+model's own Modelfile suppresses legitimate reuse of source/cluster key
+terms. Each trial is checked against both the target word count (±5%
+tolerance) **and** a set of generation sanity checks (below); if every
+trial misses tolerance, you're asked whether to retry with the full
+source text included in the prompt (not just the informative sentences
+and cluster terms).
+
+**Generation sanity checks.** Three cheap, deterministic checks run on
+every trial before it's accepted, catching visible generation
+degeneration without needing another LLM call to judge it: (1) a run of
+consecutive words, at least as long as the condensation's own mean
+words-per-sentence, that are absent from the informative sentences
+actually used in the prompt and aren't ordinary connectives -- topic
+drift/hallucinated vocabulary; (2) a single word over 30 characters --
+runaway token concatenation; (3) an exact 6-word phrase repeated two or
+more times anywhere in the text -- a repetition loop. A trial only counts
+as an outright success if it clears tolerance *and* all three checks; if
+every trial fails the checks, the closest-by-word-count trial is still
+used (never silently discarded) but clearly flagged as unreviewed in the
+console output, decision log, and human-readable report.
 
 **Verification**, per rate:
 - **Injection taxonomy** -- every non-verbatim sentence in the
@@ -265,27 +283,50 @@ informative sentences and cluster terms).
 
   | Code | Name | Meaning | Risk |
   |---|---|---|---|
-  | F | Framing | Pure connective/discourse-adverb fragment (<=4 tokens, spaCy POS/dependency-based), no propositional content | Low |
-  | T | Transition | Metalinguistic sentence about the text's own argument/structure, or any other non-verbatim span of <=6 tokens too short to reliably score as paraphrase vs. compression | Medium |
-  | R | Reformulation | Paraphrases a single identifiable source sentence | Medium-high |
-  | C | Compression | Content drawn from/merged across multiple source sentences | High |
+  | F | Framing | Whole sentence otherwise matches a source sentence; the only difference is <=4 inserted/changed tokens, all purely connective (spaCy POS/dependency-based) -- or, if nothing in the source matches at all, a freestanding connective fragment on its own | Low |
+  | T | Transition | Metalinguistic sentence about the text's own argument/structure, or a whole sentence that otherwise matches a source sentence with <=6 inserted/changed tokens that include genuine (non-connective) content | Medium |
+  | R | Reformulation | Paraphrases a single identifiable source sentence (only reached once F/T are ruled out) | Medium-high |
+  | C | Compression | Content drawn from/merged across multiple source sentences -- every source sentence sharing >=15% content-word overlap is cited (not just the closest one), shown 5 at a time with a "Show N more" toggle for the rest | High |
 
-  Classification here is **heuristic, not LLM-judged**: F is decided from
-  spaCy POS/dependency tags (coordinating/subordinating conjunctions plus
-  adverbial-modifier discourse connectives like "however"/"therefore"),
-  T's short-span rule is a length-only safety net (content-word-overlap
-  scoring is unreliable on 1-2-content-word spans), and R/C still come
-  from a word-count and keyword-based overlap rule, not a semantic
-  reading. It can misclassify ambiguous spans. A borderline-flag pass
-  surfaces F/T spans that look denser than their own definition allows,
-  and you're asked whether to keep or reclassify each one.
+  Classification here is **heuristic, not LLM-judged**. For every
+  non-verbatim sentence, the pipeline first finds its best-matching source
+  sentence (content-word overlap), then runs an actual sequence diff
+  (`difflib`) between the two -- F and T are decided from what that diff
+  actually inserted or changed, not from the sentence's raw length: all
+  connective (spaCy POS/dependency tags -- coordinating/subordinating
+  conjunctions plus adverbial-modifier discourse connectives like
+  "however"/"therefore") means F; a small amount of genuine lexical
+  content (nouns, verbs, adjectives, pronouns, adverbs, numbers, wh-words)
+  means T. R/C still come from the same word-count and keyword-based
+  overlap rule as before, not a semantic reading, and are only reached
+  once F/T are ruled out. It can misclassify ambiguous spans. A
+  borderline-flag pass surfaces F/T spans that look denser than their own
+  definition allows, and you're asked whether to keep or reclassify each
+  one.
 - **Verbatim-overlap scan** -- an independent, mechanical token-alignment
   check against the source, reported alongside (not instead of) the
   word share outside any classified span, since the two measure
   different things.
-- **Cluster coverage** -- per Phase 1 cluster, what share of its
-  stems/n-grams appear in the condensation, target vs. actual, with an
-  OK/WARN/DARK status.
+- **Cluster coverage** -- per Phase 1 cluster, what share of all
+  cluster-vocabulary token occurrences belong to it in the source (the
+  target -- the source's own relative emphasis) vs. in the condensation
+  (actual), with OK (within +/-5pp of the source's own share), WARN
+  (beyond that), or DARK (a cluster with real presence in the source gets
+  zero mentions in the condensation) status.
+
+**Source title/author(s)/date.** Before generation, you're asked for the
+source document's title, author(s), and publication date, for the report
+header -- either typed in directly (leave a field blank for "Unclear"),
+or left to the model: a small retrieval step embeds the source's
+paragraph-level chunks, retrieves the ones most likely to contain this
+front-matter information, and asks the model to extract it in a fixed
+format, falling back to "Unclear" per field rather than guessing. This
+replaced an earlier version that tried to guess the title/author from the
+condensation's own first two lines -- unreliable whenever the
+condensation didn't happen to open with a literal one-line title (the
+usual case, since the condensation prompt never asks for one). Collected
+once per corpus run and reused for every rate and any later
+regeneration.
 
 **Output**, per rate, under `data/<CORPUS_NAME>/phase2/condensation/`: the
 condensed text, an injection-report JSON, a Spyral-compatible HTML
@@ -382,7 +423,8 @@ it resumes the pipeline in the background.
 6. **Phase 2 setup** -- `top_n`/density-percentile fields, a "generate a
    condensation?" Yes/No toggle, and (if yes) rate(s), an Ollama model
    dropdown (populated live from Ollama, with an availability check),
-   and max trials.
+   max trials, and the source's title/author(s)/date -- three optional
+   text fields, or a checkbox to have the model determine them instead.
 7. **Escalation** (only if triggered) -- per rate that missed its target
    word count: the trial results and a Yes/No "retry with full source
    text?" button.
@@ -397,7 +439,9 @@ it resumes the pipeline in the background.
    default prompt" button that reveals the full rendered prompt in an
    editable text box before you submit. Regenerating reuses the same
    progress-console/polling flow as any other step, then returns here
-   with the manifest updated.
+   with the manifest updated. "Start another run" resets the server-side
+   session before reloading, so it correctly returns to the setup screen
+   instead of bouncing back to this one.
 
 Every decision submitted through the web UI is logged via the same
 `common/decisions.py` `DecisionLog` as the notebooks and
@@ -422,7 +466,11 @@ Phase 1 has three points where you make interpretive calls:
 1. **Flagged term review** -- for each stem/word whose GlossBERT-predicted
    sense disagrees with WordNet's default sense, accept the prediction,
    keep the default, enter a manual definition, or review all of them at
-   once.
+   once. Words are matched case-insensitively (a word appearing once in
+   an all-caps heading and once in normal prose no longer produces two
+   separate review items for the same underlying mismatch), and the
+   candidate list respects your configured `max_synsets` (previously
+   capped at 3 regardless of that setting).
 2. **Cluster review** -- accept, rename, or edit each semantic cluster:
    remove stems or n-grams from it, and optionally exclude removed stems
    globally.

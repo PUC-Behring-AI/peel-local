@@ -10,6 +10,7 @@ logic isn't duplicated across cells.
 
 import json
 import math
+import re
 from collections import Counter
 
 import hdbscan
@@ -22,6 +23,7 @@ from transformers import BertForSequenceClassification, BertTokenizer
 
 POS_MAP = {
     "NOUN": wn.NOUN,
+    "PROPN": wn.NOUN,
     "VERB": wn.VERB,
     "ADJ": wn.ADJ,
     "ADV": wn.ADV,
@@ -62,7 +64,14 @@ def glossbert_predict(occurrence, tokenizer, model, device, pos_map=POS_MAP, max
         return None
     synsets = synsets[:max_synsets]
 
-    marked_sentence = sentence.replace(word, f' "{word}" ', 1)
+    # Case-insensitive: word is normalized lowercase (see map_stems_to_sentences),
+    # but sentence keeps its original casing (e.g. an all-caps heading) --
+    # a case-sensitive .replace() would silently fail to find the word there.
+    match = re.search(re.escape(word), sentence, re.IGNORECASE)
+    marked_sentence = (
+        f'{sentence[:match.start()]} "{match.group()}" {sentence[match.end():]}'
+        if match else sentence
+    )
 
     results = []
     for syn in synsets:
@@ -113,7 +122,12 @@ def map_stems_to_sentences(doc, top_stems, stemmer) -> dict:
             if stem not in top_stems:
                 continue
             stem_occurrences.setdefault(stem, []).append({
-                "word": token.text,
+                # Lowercased so e.g. the same word occurring once in an
+                # all-caps heading and once in normal prose is treated as
+                # one consistent form downstream (display, dedup, cluster
+                # naming), not two -- see glossbert_predict's
+                # case-insensitive marking, which is what keeps this safe.
+                "word": token.text.lower(),
                 "stem": stem,
                 "pos": token.pos_,
                 "sentence": sent_text,
@@ -148,8 +162,9 @@ def run_glossbert_analysis(top_stems, stem_occurrences, tokenizer, model, device
             continue
 
         mismatch_found = False
+        seen_mismatches = set()
         for occurrence in occurrences:
-            word = occurrence["word"].lower()
+            word = occurrence["word"]
             wn_pos = pos_map.get(occurrence["pos"])
             synsets = wn.synsets(word, pos=wn_pos)
             if not synsets:
@@ -163,8 +178,16 @@ def run_glossbert_analysis(top_stems, stem_occurrences, tokenizer, model, device
 
             if best_sense.name() != default_sense.name():
                 mismatch_found = True
+                # Two occurrences of the same word (e.g. once from an
+                # all-caps heading, once from normal prose) that resolve
+                # to the same default/predicted senses are the same
+                # review item -- collapse them instead of flagging twice.
+                dedup_key = (word, default_sense.name(), best_sense.name())
+                if dedup_key in seen_mismatches:
+                    continue
+                seen_mismatches.add(dedup_key)
                 flagged_words.append({
-                    "word": occurrence["word"],
+                    "word": word,
                     "stem": stem,
                     "pos": occurrence["pos"],
                     "count": count,
@@ -175,13 +198,13 @@ def run_glossbert_analysis(top_stems, stem_occurrences, tokenizer, model, device
                     "predicted_definition": best_sense.definition(),
                     "top_candidates": [
                         {"sense": r["synset"].name(), "definition": r["definition"], "score": round(r["score"], 4)}
-                        for r in results[:3]
+                        for r in results[:max_synsets]
                     ],
                 })
 
         if not mismatch_found:
             for occurrence in occurrences:
-                word = occurrence["word"].lower()
+                word = occurrence["word"]
                 wn_pos = pos_map.get(occurrence["pos"])
                 synsets = wn.synsets(word, pos=wn_pos)
                 if not synsets:
@@ -198,7 +221,12 @@ def resolve_flagged_choice(item, choice):
     """Pure resolution of a flagged-term review choice; no input() here.
     Returns (kind, value): kind is "definition" (value=chosen text),
     "manual" (caller must still prompt for the custom text),
-    "accept_all", "exit", or "invalid"."""
+    "accept_all", "exit", or "invalid".
+
+    Candidate slots are 1..len(top_candidates); the manual-entry slot is
+    whatever number comes right after the last candidate -- both derived
+    from the actual candidate count (driven by max_synsets) rather than
+    a fixed "3 candidates + slot 4" assumption."""
     choice = choice.strip()
     if choice.lower() == "accept all":
         return "accept_all", None
@@ -206,13 +234,11 @@ def resolve_flagged_choice(item, choice):
         return "exit", None
     if choice == "0":
         return "definition", item["default_definition"]
-    if choice == "4":
+    candidates = item["top_candidates"]
+    if choice == str(len(candidates) + 1):
         return "manual", None
-    if choice in ("1", "2", "3"):
-        idx = int(choice) - 1
-        candidates = item["top_candidates"]
-        if idx < len(candidates):
-            return "definition", candidates[idx]["definition"]
+    if choice.isdigit() and 1 <= int(choice) <= len(candidates):
+        return "definition", candidates[int(choice) - 1]["definition"]
     return "invalid", None
 
 
@@ -317,7 +343,7 @@ def run_flagged_term_review(flagged_words, accepted_definitions, decisions):
         print_flagged_item(item)
 
         print("\n[0] Keep default definition")
-        print("[4] Enter manual definition")
+        print(f"[{len(item['top_candidates']) + 1}] Enter manual definition")
         print("Or type 'Accept all' to accept all remaining flagged terms")
 
         choice = input("\nChoice: ").strip()

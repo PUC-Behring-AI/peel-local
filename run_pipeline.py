@@ -46,7 +46,9 @@ def parse_args():
     parser.add_argument("--top-percentile", type=float, default=0.50)
     parser.add_argument("--max-stems", type=int, default=150)
     parser.add_argument("--max-sentences-per-stem", type=int, default=5)
-    parser.add_argument("--max-synsets", type=int, default=5)
+    parser.add_argument("--max-synsets", type=int, default=5,
+                         help="Ceiling, not a guarantee -- candidates shown per flagged word are also "
+                              "capped by how many senses WordNet actually has for that word's part of speech.")
     parser.add_argument("--max-cluster-size", type=int, default=10)
     parser.add_argument("--min-clusters", type=int, default=5)
     parser.add_argument("--min-cluster-len", type=int, default=3)
@@ -231,7 +233,7 @@ def run_phase1(args, paths, decisions):
 
 
 def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_state, nlp, stemmer,
-                           text, enriched_state):
+                           text, enriched_state, title=None, authors=None, date=None):
     """Runs injection analysis -> borderline review -> cluster coverage ->
     report building -> saving (condensed text, injection report, HTML
     fragment/preview, human report, plain summary, Voyant notebook,
@@ -255,7 +257,7 @@ def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_s
 
     condense.run_injection_review(all_spans, borderline_flags, rate, decisions)
 
-    coverage = condense.compute_cluster_coverage(phase1_state, condensed_text, stemmer)
+    coverage = condense.compute_cluster_coverage(phase1_state, condensed_text, text, stemmer)
     print(f"\n=== Cluster coverage: {rate}% condensation ===")
     for name, r in coverage.items():
         print(f"  {name}: target {r['target']}%, actual {r['actual']}% ({r['delta']:+.1f}pp) -- {r['status']}")
@@ -265,11 +267,14 @@ def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_s
         corpus_name=args.corpus, rate=rate,
         source_word_count=condense.count_words(text),
         phase1_json_name=paths.phase1_state_json().name,
+        title=title, authors=authors, date=date,
     )
     preview = condensation_report.build_standalone_preview(fragment, args.corpus)
+    ordered_sentences = condense.gather_ordered_informative_sentences(enriched_state)
+    sanity_issues = condense.check_condensation_sanity(condensed_text, ordered_sentences)
     report = condensation_report.build_human_report(
         all_spans, borderline_flags, coverage,
-        stats["verbatim_overlap_pct"], stats["non_injected_pct"],
+        stats["verbatim_overlap_pct"], stats["non_injected_pct"], sanity_issues,
     )
     blocks = condensation_report.parse_condensed_blocks(condensed_text)
     summary = condensation_report.build_plain_summary(blocks)
@@ -324,7 +329,8 @@ def edit_prompt_via_tempfile(default_prompt):
 
 
 def run_regeneration_loop(condensed_texts, args, paths, decisions, phase1_state, nlp, stemmer, text,
-                           enriched_state, ordered_sentences, cluster_key_terms, ollama_model, max_trials):
+                           enriched_state, ordered_sentences, cluster_key_terms, ollama_model, max_trials,
+                           title=None, authors=None, date=None):
     """After all requested rates have been generated and their reports
     built, offers to regenerate one -- optionally at a different target
     rate, optionally with a hand-edited prompt -- for as many rounds as
@@ -409,10 +415,7 @@ def run_regeneration_loop(condensed_texts, args, paths, decisions, phase1_state,
             prompt_override=prompt_text,
         )
         for t in result["trials"]:
-            print(
-                f"  trial {t['trial']}: {t['word_count']} words (target {t['target_words']}, "
-                f"{'OK' if t['within_tolerance'] else 'outside tolerance'})"
-            )
+            print(condense.format_trial_line(t))
             decisions.record(
                 step="condensation_regeneration", decision_type="trial_result",
                 prompt="Condensation regeneration trial", extra={"rate": rate, **t},
@@ -421,13 +424,16 @@ def run_regeneration_loop(condensed_texts, args, paths, decisions, phase1_state,
         if result["text"] is None:
             print(f"\nRegeneration at {rate}% failed -- no output produced. Previous outputs for this rate, if any, are unchanged.")
             continue
-        if not result["success"]:
+        if result.get("sanity_failed"):
+            print(f"\n{rate}%: no trial passed the sanity checks -- using the closest trial by word count anyway, flag it for a manual look.")
+        elif not result["success"]:
             note = "using the closest trial instead of discarding it" if result["soft_accept"] else "no valid trial"
             print(f"\n{rate}%: no trial hit the target word count within tolerance -- {note}.")
 
         condensed_texts[rate] = result["text"]
         process_and_save_rate(
             rate, result["text"], args, paths, decisions, phase1_state, nlp, stemmer, text, enriched_state,
+            title=title, authors=authors, date=date,
         )
         print(f"\nRegenerated {rate}% condensation.")
 
@@ -442,6 +448,7 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text):
     print(f"\nSaved enriched JSON to\n{paths.phase2_output_json()}")
 
     rates, ollama_model, max_trials = resolve_condensation_config(args, decisions)
+    title, authors, date = condense.run_source_metadata_setup(decisions, text, ollama_model)
 
     ordered_sentences = condense.gather_ordered_informative_sentences(enriched_state)
     cluster_key_terms = condense.gather_cluster_key_terms(enriched_state)
@@ -460,11 +467,13 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text):
     for rate, condensed_text in condensed_texts.items():
         process_and_save_rate(
             rate, condensed_text, args, paths, decisions, phase1_state, nlp, stemmer, text, enriched_state,
+            title=title, authors=authors, date=date,
         )
 
     run_regeneration_loop(
         condensed_texts, args, paths, decisions, phase1_state, nlp, stemmer, text,
         enriched_state, ordered_sentences, cluster_key_terms, ollama_model, max_trials,
+        title=title, authors=authors, date=date,
     )
 
 

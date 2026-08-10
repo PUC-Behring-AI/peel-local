@@ -390,6 +390,10 @@ $all("#screen-phase2-setup .yesno-btn").forEach((btn) => {
   });
 });
 
+$("#auto_detect_metadata").addEventListener("change", (e) => {
+  $("#metadata-fields").classList.toggle("hidden", e.target.checked);
+});
+
 async function refreshOllamaModels() {
   const statusEl = $("#ollama-status");
   const select = $("#ollama_model");
@@ -431,6 +435,10 @@ $("#phase2-form").addEventListener("submit", async (e) => {
         rates: $("#rates").value,
         ollama_model: $("#ollama_model").value,
         max_trials: parseInt($("#max_trials").value, 10),
+        title: $("#source_title").value,
+        authors: $("#source_authors").value,
+        date: $("#source_date").value,
+        auto_detect_metadata: $("#auto_detect_metadata").checked,
       }),
     });
     showScreen("screen-progress");
@@ -651,7 +659,13 @@ function renderComplete(manifest, corpus) {
   showScreen("screen-complete");
 }
 
-$("#start-new-run").addEventListener("click", () => {
+$("#start-new-run").addEventListener("click", async () => {
+  try {
+    await api("/api/reset", { method: "POST" });
+  } catch (err) {
+    // Reload anyway -- worst case init() re-syncs to whatever the server
+    // still reports, same as before this fix existed.
+  }
   window.location.reload();
 });
 

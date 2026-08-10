@@ -116,6 +116,20 @@ def start():
     return jsonify({"ok": True})
 
 
+@app.route("/api/reset", methods=["POST"])
+def reset():
+    """Clears the session back to idle -- used by "Start another run" so a
+    page reload lands on the setup screen instead of init() re-syncing to
+    the just-finished run's still-"complete" server-side status."""
+    global _session
+
+    if _session.status == "running":
+        return _error("A pipeline run is already in progress.", 409)
+
+    _session = PipelineSession()
+    return jsonify({"ok": True})
+
+
 # ------------------------------------------------------------
 # Decision endpoints
 # ------------------------------------------------------------
@@ -183,6 +197,10 @@ def decide_phase2_setup():
             rates_str=body.get("rates", ""),
             ollama_model=body.get("ollama_model", ""),
             max_trials=int(body.get("max_trials", 3)),
+            title=body.get("title", ""),
+            authors=body.get("authors", ""),
+            date=body.get("date", ""),
+            auto_detect_metadata=bool(body.get("auto_detect_metadata", False)),
         )
     except (RuntimeError, ValueError) as e:
         return _error(str(e), 400)

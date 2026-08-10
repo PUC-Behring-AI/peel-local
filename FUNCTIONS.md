@@ -93,12 +93,12 @@ Stem extraction, GlossBERT WSD, and Sentence-BERT/HDBSCAN clustering.
 | Function | Purpose | Called from |
 |---|---|---|
 | `load_glossbert(model_id=, device=)` | Loads GlossBERT from the Hugging Face Hub (`jvomiranda/GlossBERT_Checkpoint` by default) | Phase 1's GlossBERT cell, `run_pipeline.py::run_phase1` |
-| `glossbert_predict(occurrence, tokenizer, model, device, ...)` | Scores a word occurrence against its candidate WordNet senses | `run_glossbert_analysis`, `recluster_large_clusters`, `recluster_noise` |
+| `glossbert_predict(occurrence, tokenizer, model, device, ...)` | Scores a word occurrence against its candidate WordNet senses; marks the target word in its sentence via a case-insensitive regex search (robust when `word` is lowercase but `sentence` retains original casing, e.g. an all-caps heading) | `run_glossbert_analysis`, `recluster_large_clusters`, `recluster_noise` |
 | `extract_top_stems(doc, stemmer, top_percentile, max_stems)` | Frequency-ranked stem extraction | Phase 1's stem-extraction cell, `run_pipeline.py` |
 | `map_stems_to_sentences(doc, top_stems, stemmer)` | Builds `{stem: [occurrence, ...]}` | Phase 1's GlossBERT cell, `run_pipeline.py` |
 | `record_accepted_instance(accepted_definitions, stem, word, pos, definition, sentence, count)` | Insert-or-append into `accepted_definitions[stem]` | `run_glossbert_analysis`, `run_flagged_term_review` |
-| `run_glossbert_analysis(top_stems, stem_occurrences, tokenizer, model, device, ...)` | Runs WSD per stem; flags sense mismatches | Phase 1's GlossBERT cell, `run_pipeline.py` |
-| `resolve_flagged_choice(item, choice)` | Pure resolution of one flagged-term review choice (no `input()`) | `run_flagged_term_review` |
+| `run_glossbert_analysis(top_stems, stem_occurrences, tokenizer, model, device, ...)` | Runs WSD per stem (words lowercased, `PROPN` mapped to `wn.NOUN`); flags sense mismatches, deduped per stem by `(word, default_sense, predicted_sense)` so e.g. the same word from an all-caps heading and from normal prose only produces one review item; `top_candidates` respects `max_synsets` (previously hardcoded to 3) | Phase 1's GlossBERT cell, `run_pipeline.py` |
+| `resolve_flagged_choice(item, choice)` | Pure resolution of one flagged-term review choice (no `input()`); candidate slots and the manual-entry slot are keyed off `len(item["top_candidates"])`, not a fixed count | `run_flagged_term_review` |
 | `save_glossbert_output(accepted_definitions, path)` | Writes the accepted-definitions TSV | Phase 1's review cell, `run_pipeline.py` |
 | `print_accepted_definitions(...)` / `print_flagged_item(...)` / `print_flagged_words(...)` | Console printers | `run_glossbert_analysis` callers, `run_flagged_term_review` |
 | **`run_flagged_term_review(flagged_words, accepted_definitions, decisions)`** (interactive) | Accept-all / one-by-one / selective review of flagged sense mismatches | phase1.ipynb, `run_pipeline.py::run_phase1` |
@@ -156,19 +156,33 @@ are **interactive**. See README's condensation section for the taxonomy.
 | `gather_cluster_key_terms(phase1_state)` | `{cluster_name: stems+ngrams}` | Same |
 | `count_words(text)` / `target_word_count(source_text, rate_pct)` | Word counting / target-word-count from a rate | `attempt_condensation_trials` and callers |
 | `build_condensation_prompt(ordered_sentences, cluster_key_terms, target_words, corpus_name, source_text=)` | Builds the LLM prompt (escalated version includes `source_text`) | `attempt_condensation_trials` |
-| `attempt_condensation_trials(..., model, max_trials, include_full_text, ...)` | Up to `max_trials` generation attempts against Ollama, no `input()` | `run_generate_for_rate` |
+| `_split_sentences_loose(text)` | Lightweight regex sentence split (no spaCy dependency) | `_check_invented_token_run` |
+| `_check_invented_token_run(condensed_text, ordered_sentences)` | Flags a run of consecutive words (>= the condensation's mean words/sentence) absent from the informative sentences and not an ordinary function word | `check_condensation_sanity` |
+| `_check_mega_long_word(condensed_text, max_word_length=)` | Flags a single word over `max_word_length` (default 30) characters | Same |
+| `_check_repeated_ngram(condensed_text, n=, min_repeats=)` | Flags an exact `n`-word phrase (default 6) repeated `min_repeats`+ times | Same |
+| `check_condensation_sanity(condensed_text, ordered_sentences)` | Runs all three checks above; returns a list of issue descriptions (empty if clean) | `attempt_condensation_trials`, report builders |
+| `format_trial_line(t, prefix=)` | One console/log line for a generation trial (word count + any sanity issues) -- shared so `run_pipeline.py`/`webapp` don't re-derive the format | `run_generate_for_rate` and its CLI/webapp equivalents |
+| `attempt_condensation_trials(..., model, max_trials, include_full_text, ...)` | Up to `max_trials` generation attempts against Ollama (`repeat_penalty: 1.0`, `think: False`), no `input()`. Each trial is checked against both word-count tolerance and `check_condensation_sanity`; a trial only short-circuits as success when both pass. Returns `{"text", "trials", "success", "soft_accept", "sanity_failed"}` -- falls back to the closest sane trial, or, only if every trial failed sanity, the closest trial overall (tagged `sanity_failed: True`), rather than ever discarding output silently | `run_generate_for_rate` |
 | **`run_condensation_setup(decisions, host=)`** (interactive) | Ollama availability check + rate(s)/model/max-trials prompts | phase2.ipynb, `run_pipeline.py::resolve_condensation_config` |
 | **`run_generate_for_rate(rate, ..., decisions, host=)`** (interactive) | Non-escalated trials, then the escalation prompt/retry if needed | phase2.ipynb, `run_pipeline.py::run_phase2` |
+| `_chunk_source_text(source_text, max_chunk_words=)` | Paragraph-level chunks of the source (further split if over `max_chunk_words`) | `extract_source_metadata` |
+| `_parse_source_metadata_response(response)` | Parses the fixed `"TITLE: ...\nAUTHOR(S): ...\nDATE: ..."` LLM response format; missing/blank fields become `"Unclear"` | Same |
+| `extract_source_metadata(source_text, model, embedder_name=, top_k=, host=)` | Retrieval-augmented title/author(s)/date extraction: embeds source chunks + a synthetic query, retrieves the `top_k` most relevant chunks by cosine similarity, asks the LLM to extract structured metadata from just those | `run_source_metadata_setup`, webapp's auto-detect path |
+| **`run_source_metadata_setup(decisions, source_text, ollama_model, host=)`** (interactive) | Manual entry (blank -> "Unclear") or LLM auto-detection of the source's title/author(s)/date. Like the post-condensation regeneration feature, this is wired into `run_pipeline.py` and the webapp only, not the notebooks | `run_pipeline.py::run_phase2` |
 | `in_source(chunk_words, source_lower)` | Whole-phrase verbatim membership test | `classify_span`, `scan_verbatim_overlap` |
 | `scan_verbatim_overlap(condensed_text, source_text, ...)` | Longest-run token-alignment scan against the source | `compute_injection_stats` |
-| `_content_words(text, extra_function_words=)` | Content (non-function-word) tokens of a string | `classify_span`, `flag_borderline_classifications` |
+| `_content_words(text, extra_function_words=)` | Content (non-function-word) tokens of a string | `classify_span`'s overlap alignment, `flag_borderline_classifications` |
 | `is_metalinguistic(sentence)` | Keyword check for "about the text's own argument" sentences | `classify_span` |
-| `classify_span(sent, source_sentences, source_lower, span_id)` | F/T/R/C classification of one sentence (`sent` is a spaCy `Span`, not a string; `None` if verbatim). F is POS/dependency-based (`CONNECTIVE_POS`/`_is_connective_token`); T adds a length-only safety net for short non-metalinguistic spans | `classify_condensation` |
+| `_is_connective_token(token)` | F's connective test on one spaCy token (`CONNECTIVE_POS`, `dep_=="advmod"`, or freestanding `ADV`+`ROOT`) | `classify_span`, `_is_lexical_token` |
+| `_is_lexical_token(token)` | T's genuine-content test on one spaCy token (`LEXICAL_POS` or a wh-word `tag_`), excluding anything `_is_connective_token` already claims | `classify_span` |
+| `_diff_inserted_tokens(condensed_tokens, source_word_tokens)` | `difflib`-based diff of a condensed sentence's tokens against its best-matching source sentence's tokens; returns just the inserted/changed tokens (deletions ignored) | `classify_span` |
+| `classify_span(sent, source_sentences, source_lower, span_id)` | F/T/R/C classification of one sentence (`sent` is a spaCy `Span`, not a string; `None` if verbatim). Finds the best-matching source sentence, diffs the two, and classifies the whole sentence: F if the delta is <=4 purely connective tokens, T if it's <=6 tokens including genuine lexical content (or a metalinguistic-phrase match), R/C only once both are ruled out. C's `source_refs` lists every source sentence with >=0.15 content-word overlap (sorted strongest-first), not just the single best match | `classify_condensation` |
 | `classify_condensation(condensed_text, source_text, nlp)` | Classifies every body-prose sentence, block by block | Phase 2's injection-analysis cell, `run_pipeline.py` |
-| `flag_borderline_classifications(all_spans)` | Flags F/T spans denser than their own definition allows | Same |
+| `flag_borderline_classifications(all_spans)` | Cross-checks F/T's POS/dependency-based verdict against the old lexical word-list heuristic and flags disagreement (on the diff tokens for diff-based spans, the whole sentence for the no-match/phrase-match fallbacks) | Same |
 | **`run_injection_review(all_spans, borderline_flags, rate, decisions)`** (interactive) | Per-flag keep-or-reclassify prompt | phase2.ipynb, `run_pipeline.py::run_phase2` |
 | `compute_injection_stats(all_spans, condensed_text, source_text)` | `non_injected_pct` + `verbatim_overlap_pct` (two independent checks) | Phase 2's injection-analysis cell, `run_pipeline.py` |
-| `compute_cluster_coverage(phase1_state, condensed_text, stemmer, target_pct=)` | Per-cluster stem/n-gram coverage vs. target, with OK/WARN/DARK status | Phase 2's coverage cell, `run_pipeline.py` |
+| `_cluster_hit_counts(text, clusters, stemmer)` | Token/phrase-occurrence hit counts per cluster, for one text | `compute_cluster_coverage` |
+| `compute_cluster_coverage(phase1_state, condensed_text, source_text, stemmer, tolerance_pp=)` | Per-cluster share of all cluster-vocabulary occurrences (source vs. condensation), with OK/WARN/DARK status | Phase 2's coverage cell, `run_pipeline.py` |
 
 ## `phase2/condensation_report.py`
 
@@ -177,16 +191,16 @@ and the plainer report formats.
 
 | Function | Purpose | Called from |
 |---|---|---|
-| `parse_condensed_blocks(condensed_text)` | Splits condensed text into typed blocks (`h1`/`authors`/`h2`/`h3`/`defn`/`p`) | `classify_condensation` (condense.py), `build_condensation_fragment`, `build_plain_summary` |
+| `parse_condensed_blocks(condensed_text)` | Splits condensed text into typed blocks (`h2`/`h3`/`defn`/`p`). No longer guesses a title/author from the first two lines -- that positional heuristic misfired whenever the condensation didn't open with a literal one-line title (the normal case); the report's title/author/date now come from `run_source_metadata_setup`/`extract_source_metadata` instead | `classify_condensation` (condense.py), `build_condensation_fragment`, `build_plain_summary` |
 | `_spans_in_block(block_text, all_spans)` | Which classified spans fall inside one block | `_render_blocks_with_toggles` |
 | `render_spans(block_text, all_spans)` | Wraps classified spans in their `S['inj_*']` style | `_render_blocks_with_toggles` |
-| `render_c_toggle(span_id, source_texts)` / `render_r_toggle(span_id, source_text)` | Collapsed `<details>` source-reveal toggles | `_render_blocks_with_toggles` |
+| `render_c_toggle(span_id, source_texts, max_shown=)` / `render_r_toggle(span_id, source_text)` | Collapsed `<details>` source-reveal toggles; `render_c_toggle` shows the first `max_shown` (default 5) sources directly and nests any remainder behind a second "Show N more" toggle | `_render_blocks_with_toggles` |
 | `_render_blocks_with_toggles(body_blocks, all_spans, source_sentences)` | Renders every body block with inline toggles after C/R spans | `build_condensation_fragment` |
 | `build_meta_legend(...)` | Metadata table + F/T/R/C color legend | `build_condensation_fragment` |
 | `build_coverage_table(coverage_report)` | Cluster-coverage HTML table | `build_condensation_fragment` |
-| `build_condensation_fragment(condensed_text, all_spans, source_sentences, coverage_report, ...)` | Assembles the full inline-style HTML fragment | Phase 2's export cell, `run_pipeline.py`, `voyant_notebook.build_voyant_notebook` |
+| `build_condensation_fragment(condensed_text, all_spans, source_sentences, coverage_report, ..., title=, authors=, date=)` | Assembles the full inline-style HTML fragment: metadata table + F/T/R/C legend first, then the title/byline header (from the explicit `title`/`authors`/`date` args, optional -- falls back to `corpus_name` with no byline), then the body and coverage table | Phase 2's export cell, `run_pipeline.py`, `voyant_notebook.build_voyant_notebook` |
 | `build_standalone_preview(fragment_html, corpus_name)` | Wraps the fragment in a minimal browsable `<html>` | Same callers |
-| `build_human_report(all_spans, borderline_flags, coverage_report, ...)` | Plain-text verification report | Same |
+| `build_human_report(all_spans, borderline_flags, coverage_report, ..., sanity_issues=)` | Plain-text verification report, including a "Generation sanity checks" section | Same |
 | `build_plain_summary(blocks)` | Markup-free title/body text | Same |
 | `save_condensation_outputs(paths_dict, fragment, preview, report, summary, injection_report_data)` | Writes 5 of the 6 per-rate output files (condensed text is saved separately) | Phase 2's export cell, `run_pipeline.py` |
 
@@ -203,5 +217,5 @@ corpus in a single script -- see README's "Running the pipeline" for usage.
 | `place_raw_text(args, paths)` | Copies `--input` to `paths.raw_txt()`, or runs `clean_corpus.clean_text` first if `--clean` |
 | `resolve_condensation_config(args, decisions)` | Uses CLI condensation flags if all three given (logged with `"source": "cli"`); else falls back to `condense.run_condensation_setup` |
 | `run_phase1(args, paths, decisions)` | Mirrors `phase1.ipynb` cell-by-cell; returns `(phase1_state, nlp, stemmer, text)` |
-| `run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text)` | Mirrors `phase2.ipynb` cell-by-cell |
+| `run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text)` | Mirrors `phase2.ipynb` cell-by-cell, plus `condense.run_source_metadata_setup` and the post-completion regeneration loop (`run_regeneration_loop`), neither of which the notebook has |
 | `main()` | Wires `CorpusPaths`, `place_raw_text`, `run_phase1` (its own `DecisionLog(phase="phase1")`), `run_phase2` (its own `DecisionLog(phase="phase2")`) |
