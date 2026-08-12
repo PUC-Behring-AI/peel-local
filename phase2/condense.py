@@ -279,26 +279,40 @@ def attempt_condensation_trials(ordered_sentences, cluster_key_terms, target_wor
                                  prompt_override=None):
     """Runs up to max_trials generation attempts, no input() involved.
     Returns {"text": str|None, "trials": [...], "success": bool,
-    "soft_accept": bool, "sanity_failed": bool}. The notebook decides what
-    to do next (retry escalated, give up).
+    "soft_accept": bool, "sanity_failed": bool, "sanity_review_candidates":
+    [...]}. The caller decides what to do next (offer a sanity-check
+    review, retry escalated, give up).
 
     Every trial is checked both for word-count tolerance and for basic
     generation sanity (check_condensation_sanity -- catches topic drift,
     runaway token concatenation, and repetition loops). A trial is only
     the immediate "success" return when it clears both.
 
-    If no trial lands within tolerance, falls back to the trial closest
-    to target_words among the ones that passed the sanity check
-    ("soft_accept": True) rather than discarding everything -- an
-    over-length-but-coherent response still produces something usable
-    instead of being thrown away. Only if every trial failed the sanity
-    check does the fallback fall back further, to the closest trial
-    overall, tagged "sanity_failed": True so callers/logs can disclose
-    that clearly -- never silently discard output, same principle as
-    soft_accept itself. "success" stays False whenever tolerance wasn't
-    hit, so callers can still offer escalation; only a genuinely empty
-    result (text is None) means every trial failed outright (e.g.
-    max_trials == 0).
+    A trial that hits the word-count target but fails the sanity check is
+    NOT auto-selected either way -- the sanity check is a heuristic
+    (verbatim-repetition detector etc.), not a correctness guarantee, so
+    silently keeping or silently discarding such a trial both risk being
+    wrong. Every trial in that situation across the run is collected into
+    "sanity_review_candidates" (word count + which sanity check(s) it
+    failed, no auto-picked winner) for the caller to put in front of the
+    researcher. "text" is left None and "success" False whenever any such
+    candidates exist, even if a full success or a soft-accept fallback
+    would otherwise have been available -- the point is that this
+    specific situation always goes to the researcher, not that the
+    pipeline degrades to guessing for it.
+
+    Failing that, falls back the same way it always has: closest trial by
+    word count among the ones that passed the sanity check ("soft_accept":
+    True) rather than discarding everything -- an over-length-but-coherent
+    response still produces something usable instead of being thrown
+    away. Only if every trial failed the sanity check does the fallback
+    fall back further, to the closest trial overall, tagged
+    "sanity_failed": True so callers/logs can disclose that clearly --
+    never silently discard output, same principle as soft_accept itself.
+    "success" stays False whenever tolerance wasn't hit, so callers can
+    still offer escalation; only a genuinely empty result (text is None
+    and sanity_review_candidates is empty) means every trial failed
+    outright (e.g. max_trials == 0).
 
     `prompt_override`, if given, is used verbatim as the prompt for every
     trial instead of the one build_condensation_prompt would render --
@@ -312,6 +326,7 @@ def attempt_condensation_trials(ordered_sentences, cluster_key_terms, target_wor
     trials = []
     best_diff, best_text = None, None
     fallback_diff, fallback_text = None, None
+    sanity_review_candidates = []
     for trial in range(1, max_trials + 1):
         prompt = prompt_override if prompt_override is not None else build_condensation_prompt(
             ordered_sentences, cluster_key_terms, target_words, corpus_name,
@@ -339,18 +354,31 @@ def attempt_condensation_trials(ordered_sentences, cluster_key_terms, target_wor
         })
 
         if within_tolerance and sane:
-            return {"text": text, "trials": trials, "success": True, "soft_accept": False, "sanity_failed": False}
+            return {"text": text, "trials": trials, "success": True, "soft_accept": False,
+                    "sanity_failed": False, "sanity_review_candidates": []}
+
+        if within_tolerance and not sane:
+            sanity_review_candidates.append({
+                "trial": trial, "word_count": word_count, "target_words": target_words,
+                "text": text, "sanity_issues": sanity_issues,
+            })
 
         if sane and (best_diff is None or diff < best_diff):
             best_diff, best_text = diff, text
         if not sane and (fallback_diff is None or diff < fallback_diff):
             fallback_diff, fallback_text = diff, text
 
+    if sanity_review_candidates:
+        return {"text": None, "trials": trials, "success": False, "soft_accept": False,
+                "sanity_failed": False, "sanity_review_candidates": sanity_review_candidates}
     if best_text is not None:
-        return {"text": best_text, "trials": trials, "success": False, "soft_accept": True, "sanity_failed": False}
+        return {"text": best_text, "trials": trials, "success": False, "soft_accept": True,
+                "sanity_failed": False, "sanity_review_candidates": []}
     if fallback_text is not None:
-        return {"text": fallback_text, "trials": trials, "success": False, "soft_accept": True, "sanity_failed": True}
-    return {"text": None, "trials": trials, "success": False, "soft_accept": False, "sanity_failed": False}
+        return {"text": fallback_text, "trials": trials, "success": False, "soft_accept": True,
+                "sanity_failed": True, "sanity_review_candidates": []}
+    return {"text": None, "trials": trials, "success": False, "soft_accept": False,
+            "sanity_failed": False, "sanity_review_candidates": []}
 
 
 # ============================================================
@@ -400,7 +428,7 @@ def _parse_source_metadata_response(response):
 
 
 def extract_source_metadata(source_text, model, embedder_name="all-MiniLM-L6-v2",
-                             top_k=5, host=ollama_client.DEFAULT_HOST):
+                             top_k=5, host=ollama_client.DEFAULT_HOST, lead_chunks=3):
     """Retrieval-augmented title/author(s)/date extraction: embeds the
     source's paragraph-level chunks plus one synthetic query describing
     what we're looking for, retrieves the top_k most relevant chunks by
@@ -409,7 +437,17 @@ def extract_source_metadata(source_text, model, embedder_name="all-MiniLM-L6-v2"
     front-matter-only task is usually far more than a local model needs
     and dilutes its attention. Returns (title, authors, date); any field
     the model isn't confident about comes back "Unclear" (an explicit
-    instruction in the prompt, not a guess)."""
+    instruction in the prompt, not a guess).
+
+    Pure semantic retrieval is unreliable for this specific task: a title
+    or a bare author name is a short, information-sparse chunk that often
+    scores *worse* against the query than an unrelated body paragraph
+    happens to (verified empirically -- on a real corpus, the title and
+    author chunks ranked 159th and 124th of 181 by cosine similarity,
+    nowhere near top_k). Front matter is, however, reliably positioned at
+    the very start of virtually every document, so the first lead_chunks
+    chunks are always included alongside the semantically retrieved ones
+    rather than relying on embedding similarity to surface them."""
     chunks = _chunk_source_text(source_text)
     if not chunks:
         return "Unclear", "Unclear", "Unclear"
@@ -419,8 +457,9 @@ def extract_source_metadata(source_text, model, embedder_name="all-MiniLM-L6-v2"
     chunk_embeddings = embedder.encode(chunks, convert_to_numpy=True, normalize_embeddings=True)
     query_embedding = embedder.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
     scores = chunk_embeddings @ query_embedding
-    top_indices = sorted(scores.argsort()[::-1][:top_k])
-    retrieved = "\n\n---\n\n".join(chunks[i] for i in top_indices)
+    top_indices = set(scores.argsort()[::-1][:top_k].tolist())
+    top_indices.update(range(min(lead_chunks, len(chunks))))
+    retrieved = "\n\n---\n\n".join(chunks[i] for i in sorted(top_indices))
 
     prompt = (
         "Below are excerpts from a document, retrieved because they are most likely "
@@ -524,16 +563,71 @@ def run_condensation_setup(decisions, host=ollama_client.DEFAULT_HOST):
     return rates, ollama_model, max_trials
 
 
+def run_sanity_review_for_rate(rate, result, decisions, escalated=False):
+    """Interactive: at least one trial for this rate hit the target word
+    count but failed a generation sanity check -- attempt_condensation_trials
+    never auto-picks in that situation (see its docstring), since the
+    sanity check is a heuristic (verbatim-repetition detector etc.), not
+    a confirmed error, and silently keeping or silently discarding it are
+    both risky. Prints every such candidate with its word count and the
+    specific check(s) it failed, and lets the researcher accept one of
+    them or reject all of them. Rejecting leaves result["text"] None so
+    the normal give-up/escalation path runs next, same as if nothing had
+    hit tolerance at all. Every choice is appended to the decisions log
+    via `decisions.record(...)`. Shared by phase2.ipynb and
+    run_pipeline.py. Mutates and returns `result`."""
+    candidates = result["sanity_review_candidates"]
+    label = "escalated " if escalated else ""
+    print(
+        f"\n{len(candidates)} {label}trial(s) at {rate}% hit the target word count but "
+        "failed a generation sanity check (a heuristic, not a confirmed error) -- "
+        "review and pick one to keep, or reject all of them:"
+    )
+    for c in candidates:
+        print(f"\n  [{c['trial']}] {c['word_count']} words (target {c['target_words']})")
+        for issue in c["sanity_issues"]:
+            print(f"      - {issue}")
+
+    choice = input(
+        f"\nAccept one of these trials for {rate}%? Enter a trial number, or ENTER for none: "
+    ).strip()
+
+    accepted = next((c for c in candidates if str(c["trial"]) == choice), None) if choice else None
+    if choice and accepted is None:
+        print(f"'{choice}' isn't one of the listed trial numbers -- treating as none.")
+
+    decisions.record(
+        step="condensation_generation", decision_type="sanity_review_choice",
+        prompt="Accept a trial that hit the word-count target but failed a sanity check?",
+        choice=str(accepted["trial"]) if accepted else "none",
+        extra={"rate": rate, "escalated": escalated,
+               "candidates": [{"trial": c["trial"], "word_count": c["word_count"],
+                                "sanity_issues": c["sanity_issues"]} for c in candidates]},
+    )
+
+    if accepted is not None:
+        result["text"] = accepted["text"]
+        result["researcher_accepted_despite_sanity"] = True
+        print(f"\nAccepted trial {accepted['trial']} for {rate}% despite the sanity flag above.")
+    else:
+        result["text"] = None
+        print(f"\nRejected all sanity-flagged trials for {rate}%.")
+
+    return result
+
+
 def run_generate_for_rate(rate, ordered_sentences, cluster_key_terms, target_words, corpus_name,
                            text, model, max_trials, decisions, host=ollama_client.DEFAULT_HOST):
     """Runs the full interactive generate-then-maybe-escalate flow for one
-    rate: non-escalated trials, then (if none land within tolerance) asks
-    whether to retry with the full source text included, logging every
-    trial and the escalation choice via `decisions.record(...)`. Saving
+    rate: non-escalated trials, then (if any hit the word-count target
+    but failed a sanity check) a sanity review, then (if still nothing
+    accepted) asks whether to retry with the full source text included --
+    logging every trial and choice via `decisions.record(...)`. Saving
     the resulting text to disk stays with the caller. Shared by
     phase2.ipynb and run_pipeline.py so there's one implementation, not
     two. Returns the same {"text", "trials", "success"} shape as
-    attempt_condensation_trials."""
+    attempt_condensation_trials, plus "researcher_accepted_despite_sanity"
+    when a sanity-flagged trial was explicitly kept."""
     print(f"\n=== {rate}% condensation (target ~{target_words} words) ===")
 
     result = attempt_condensation_trials(
@@ -549,10 +643,13 @@ def run_generate_for_rate(rate, ordered_sentences, cluster_key_terms, target_wor
             extra={"rate": rate, **t},
         )
 
-    if not result["success"]:
+    if result["sanity_review_candidates"]:
+        result = run_sanity_review_for_rate(rate, result, decisions)
+
+    if not result["success"] and not result.get("researcher_accepted_despite_sanity"):
 
         escalate = input(
-            f"\n{max_trials} trial(s) at {rate}% did not hit the target word count.\n"
+            f"\n{max_trials} trial(s) at {rate}% did not produce an accepted condensation.\n"
             "Retry with the full source text included in the prompt? (y/n): "
         ).strip().lower()
 
@@ -578,8 +675,13 @@ def run_generate_for_rate(rate, ordered_sentences, cluster_key_terms, target_wor
                     extra={"rate": rate, "escalated": True, **t},
                 )
 
+            if result["sanity_review_candidates"]:
+                result = run_sanity_review_for_rate(rate, result, decisions, escalated=True)
+
     if result["text"] is None:
-        print(f"\nGiving up on {rate}% -- no condensation within tolerance. Skipping verification/export for this rate.")
+        print(f"\nGiving up on {rate}% -- no condensation accepted. Skipping verification/export for this rate.")
+    elif result.get("researcher_accepted_despite_sanity"):
+        pass  # already reported by run_sanity_review_for_rate above
     elif result.get("sanity_failed"):
         print(
             f"\n{rate}%: no trial passed the sanity checks -- using the closest trial by word count anyway "
@@ -795,9 +897,20 @@ def classify_span(sent, source_sentences, source_lower, span_id):
         }
 
     if is_metalinguistic(sentence):
+        # source_refs stays [] -- a metalinguistic span is meta-commentary
+        # on the argument as a whole, not officially a paraphrase of any
+        # one source sentence, so it doesn't get the R/C-style attribution.
+        # But the content-word-overlap match above already ran (best_idx),
+        # and this rule is a blunt substring test that can misfire on a
+        # sentence that's mostly real object-level content (see
+        # flag_borderline_classifications) -- candidate_source_ref keeps
+        # that already-computed match around, unused unless this span
+        # gets flagged borderline, so a reviewer isn't left with zero
+        # context to judge the call.
         return {
             "span_id": span_id, "type": "T", "text": sentence,
             "source_refs": [], "justification": "", "basis": "phrase_match",
+            "candidate_source_ref": best_idx,
         }
 
     # T: a small (<=6-token) delta from the best-matching source sentence
@@ -904,6 +1017,7 @@ def flag_borderline_classifications(all_spans):
             if len(words) > 4 or len(content_words) > 0:
                 flags.append({
                     "span_id": s["span_id"], "type": "F", "text": s["text"],
+                    "source_refs": s.get("source_refs", []),
                     "reason": (f"{len(words)} words, {len(content_words)} lexically content-bearing "
                                "token(s) -- the POS/dependency classifier called this a pure "
                                "connective/discourse-adverb fragment (<=4 tokens); the word-list "
@@ -915,6 +1029,7 @@ def flag_borderline_classifications(all_spans):
             if content_words:
                 flags.append({
                     "span_id": s["span_id"], "type": "F", "text": s["text"],
+                    "source_refs": s.get("source_refs", []),
                     "reason": (f"Inserted token(s) {diff_text!r} were called purely connective by the "
                                f"POS/dependency classifier, but the word-list heuristic considers "
                                f"{len(content_words)} of them content-bearing -- worth a manual check."),
@@ -922,21 +1037,38 @@ def flag_borderline_classifications(all_spans):
         elif s["type"] == "T" and basis == "phrase_match":
             content_words = _content_words(s["text"], DISCOURSE_MARKER_EXTRAS)
             if len(content_words) > 4:
+                # This span's real source_refs is always [] by design (see
+                # classify_span) -- but candidate_source_ref kept the
+                # content-word-overlap match that was computed anyway, so
+                # a reviewer deciding whether to move this to R/C can see
+                # what it would most likely attribute to instead of
+                # nothing. Not an official match -- source_is_candidate_only
+                # tells callers to label it as such, not as a confirmed
+                # attribution.
+                candidate_ref = s.get("candidate_source_ref")
                 flags.append({
                     "span_id": s["span_id"], "type": "T", "text": s["text"],
+                    "source_refs": [candidate_ref] if candidate_ref is not None else [],
+                    "source_is_candidate_only": candidate_ref is not None,
                     "reason": (f"{len(content_words)} content-bearing tokens -- unusually high for a "
                                "metalinguistic span; may carry object-level content that belongs in R or C instead"),
                 })
     return flags
 
 
-def run_injection_review(all_spans, borderline_flags, rate, decisions):
+def run_injection_review(all_spans, borderline_flags, rate, decisions, source_sentences=None):
     """Interactive borderline-classification review: prints each flagged
     span and lets the researcher keep or reclassify it. Mutates all_spans
     entries in place. Every choice is appended to the decisions log via
     `decisions.record(...)` for later audit -- it does not change the
     interactive flow. Shared by phase2.ipynb and run_pipeline.py so
-    there's one implementation, not two."""
+    there's one implementation, not two.
+
+    `source_sentences`, if given (the second value classify_condensation
+    returns), lets each flag also print the source sentence(s) it was
+    matched against -- the researcher otherwise has to keep the whole
+    source open in another window to judge whether a "keep or reassign"
+    call is right."""
     if not borderline_flags:
         print("No borderline classifications flagged.")
         return
@@ -949,6 +1081,11 @@ def run_injection_review(all_spans, borderline_flags, rate, decisions):
 
         print(f"\n  {flag['span_id']} ({flag['type']}): {flag['reason']}")
         print(f'    "{flag["text"]}"')
+        if source_sentences is not None:
+            label = "closest candidate (not an official match)" if flag.get("source_is_candidate_only") else "source"
+            for idx in flag.get("source_refs", []):
+                if 0 <= idx < len(source_sentences):
+                    print(f'    {label}[{idx}]: "{source_sentences[idx]}"')
 
         new_type = input(
             "  Keep as classified, or reclassify? [ENTER = keep / F / T / R / C]: "

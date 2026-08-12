@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """PEEL-Local web interface: a Flask server wrapping run_pipeline.py's
-same end-to-end flow (Phase 0 optional -> Phase 1 -> Phase 2 -> Voyant +
-standalone report export) behind a browser UI -- file upload, every CLI
+same end-to-end flow (Phase 0 optional -> Phase 1 -> Phase 2 -> Phase 3
+distant reading -> standalone report export) behind a browser UI -- file
+upload, every CLI
 config parameter as an editable field, and every interactive decision
 point as a form instead of a terminal prompt.
 
@@ -19,6 +20,7 @@ one was doing.
 
 import re
 import sys
+import traceback
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -168,21 +170,6 @@ def decide_cluster_review():
     return jsonify({"ok": True})
 
 
-@app.route("/api/decisions/voyant-settings", methods=["POST"])
-def decide_voyant_settings():
-    err = _require_decision("voyant_settings")
-    if err:
-        return err
-    body = request.get_json(force=True) or {}
-    try:
-        _session.apply_voyant_settings(
-            body.get("corpus_id", ""), bool(body.get("use_smart_stopwords", False)),
-        )
-    except RuntimeError as e:
-        return _error(str(e), 400)
-    return jsonify({"ok": True})
-
-
 @app.route("/api/decisions/phase2-setup", methods=["POST"])
 def decide_phase2_setup():
     err = _require_decision("phase2_setup")
@@ -200,9 +187,50 @@ def decide_phase2_setup():
             title=body.get("title", ""),
             authors=body.get("authors", ""),
             date=body.get("date", ""),
-            auto_detect_metadata=bool(body.get("auto_detect_metadata", False)),
         )
     except (RuntimeError, ValueError) as e:
+        return _error(str(e), 400)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/detect-metadata")
+def detect_metadata():
+    """Runs the AI title/author/date detector against this corpus's
+    untouched pre-Phase-0 source text, for the Phase 2 setup screen to
+    pre-fill its fields with before the researcher sees them -- "the
+    workflow already tried this" instead of asking the researcher to type
+    it in blind. Synchronous (not a background job): it's one small
+    retrieval-augmented LLM call, same latency class as the regeneration
+    prompt preview route."""
+    if _session.status != "awaiting_input" or not _session.decision or _session.decision["type"] != "phase2_setup":
+        actual = _session.decision["type"] if _session.decision else None
+        print(f"[detect-metadata] rejected: status={_session.status!r}, decision_type={actual!r} (expected awaiting_input/phase2_setup)")
+        return _error("Metadata detection is only available on the Phase 2 setup screen.", 409)
+    ollama_model = request.args.get("ollama_model", "").strip()
+    if not ollama_model:
+        print("[detect-metadata] rejected: no ollama_model in request")
+        return _error("An Ollama model is required.")
+    try:
+        result = _session.detect_metadata(ollama_model)
+    except RuntimeError as e:
+        print(f"[detect-metadata] RuntimeError: {e}")
+        return _error(str(e), 400)
+    except Exception as e:  # noqa: BLE001 -- surfaced to the UI, not a bare crash
+        print(f"[detect-metadata] unexpected exception: {e}")
+        traceback.print_exc()
+        return _error(f"Metadata detection failed: {e}", 500)
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/decisions/sanity-review", methods=["POST"])
+def decide_sanity_review():
+    err = _require_decision("sanity_review")
+    if err:
+        return err
+    body = request.get_json(force=True) or {}
+    try:
+        _session.apply_sanity_review(body.get("decisions", {}))
+    except RuntimeError as e:
         return _error(str(e), 400)
     return jsonify({"ok": True})
 
@@ -229,6 +257,19 @@ def decide_injection_review():
     try:
         _session.apply_injection_review(body.get("decisions", {}))
     except RuntimeError as e:
+        return _error(str(e), 400)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/decisions/collocation-review", methods=["POST"])
+def decide_collocation_review():
+    err = _require_decision("collocation_review")
+    if err:
+        return err
+    body = request.get_json(force=True) or {}
+    try:
+        _session.apply_collocation_review(body.get("selected_indices", []))
+    except (RuntimeError, KeyError, IndexError) as e:
         return _error(str(e), 400)
     return jsonify({"ok": True})
 

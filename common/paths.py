@@ -17,10 +17,11 @@ class CorpusPaths:
         self.raw_dir = self.root / "raw"
         self.phase1_dir = self.root / "phase1"
         self.phase2_dir = self.root / "phase2"
+        self.phase3_dir = self.root / "phase3"
         self.decisions_dir = self.root / "decisions"
 
     def ensure_dirs(self):
-        for d in (self.raw_dir, self.phase1_dir, self.phase2_dir,
+        for d in (self.raw_dir, self.phase1_dir, self.phase2_dir, self.phase3_dir,
                   self.decisions_dir, self.condensation_dir()):
             d.mkdir(parents=True, exist_ok=True)
 
@@ -60,12 +61,8 @@ class CorpusPaths:
             "plain_summary": base / f"{stem}-summary.txt",
         }
 
-    def voyant_notebook_path(self, rate: int) -> Path:
-        return self.condensation_dir() / f"{self.corpus_name}-voyant-notebook-{rate}pct.html"
-
     def standalone_report_path(self, rate: int) -> Path:
         return self.condensation_dir() / f"{self.corpus_name}-standalone-report-{rate}pct.html"
 
-
-def resources_dir() -> Path:
-    return REPO_ROOT / "resources"
+    def distant_reading_report_path(self) -> Path:
+        return self.phase3_dir / f"{self.corpus_name}-distant-reading-report.html"

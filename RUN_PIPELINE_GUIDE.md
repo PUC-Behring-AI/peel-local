@@ -1,16 +1,18 @@
 # `run_pipeline.py` usage guide
 
 `run_pipeline.py` (repo root) runs Phase 0 (optional) &rarr; Phase 1 &rarr;
-Phase 2 &rarr; Voyant + standalone report export on **one new corpus**, in
-a single command. It calls the exact same functions the notebooks call
-(`phase1/pipeline.py`, `phase2/pipeline.py`, `phase2/condense.py`,
-`phase2/condensation_report.py`, `common/voyant_notebook.py`,
-`common/standalone_report.py`) -- interactive prompts, outputs, and
+Phase 2 &rarr; Phase 3 (distant reading) &rarr; standalone report export
+on **one new corpus**, in a single command. It calls the exact same
+functions the notebooks call (`phase1/pipeline.py`, `phase2/pipeline.py`,
+`phase2/condense.py`, `phase2/condensation_report.py`,
+`common/standalone_report.py`), plus `phase3/pipeline.py` for the one
+step with no notebook equivalent -- interactive prompts, outputs, and
 decision logs are identical to running `phase0.ipynb` (optional) +
-`phase1.ipynb` + `phase2.ipynb` by hand. See the root
-[README.md](README.md) for the pipeline's overall shape and the
-[web interface](README.md#web-interface) if you'd rather drive this
-through a browser instead of a terminal.
+`phase1.ipynb` + `phase2.ipynb` by hand, with Phase 3 running
+automatically in between Phase 2's report-building and its
+regeneration loop. See the root [README.md](README.md) for the
+pipeline's overall shape and the [web interface](README.md#web-interface)
+if you'd rather drive this through a browser instead of a terminal.
 
 ## Prerequisites
 
@@ -84,9 +86,9 @@ python run_pipeline.py --corpus Boisseau --input path/to/Boisseau.txt \
 ```
 
 Skips the condensation-setup prompt (rates/model/trials are already
-given). Phase 1's review prompts (flagged terms, clusters, Voyant
-settings) still happen interactively -- there's currently no flag to
-skip those; use the [web interface](README.md#web-interface) if you want
+given). Phase 1's review prompts (flagged terms, clusters) still happen
+interactively -- there's currently no flag to skip those; use the
+[web interface](README.md#web-interface) if you want
 those decisions in a form instead of a terminal, or the notebooks
 directly if you want to script around them.
 
@@ -110,41 +112,45 @@ In order, when they appear:
    specific terms. Only appears if GlossBERT flagged any sense
    mismatches.
 2. **Cluster review** (Phase 1, after clustering + n-gram mining) --
-   per cluster: accept as-is, or rename/remove stems/remove
-   n-grams/exclude removed stems globally.
-3. **Voyant settings** (Phase 1, before saving) -- a Voyant corpus ID
-   (can be left blank) and whether to apply Voyant's `en_smart`
-   stopword list.
-4. **Condensation setup** (Phase 2) -- only if `--rates`/`--ollama-model`/
+   per cluster: accept as-is, or rename/remove stems/remove n-grams.
+3. **Condensation setup** (Phase 2) -- only if `--rates`/`--ollama-model`/
    `--max-trials` weren't all given on the command line: rate(s), Ollama
    model, max trials.
-5. **Escalation** (Phase 2, per rate, only if trials miss the target) --
+4. **Escalation** (Phase 2, per rate, only if trials miss the target) --
    retry with the full source text included in the prompt?
-6. **Borderline classification review** (Phase 2, only if any F/T spans
+5. **Borderline classification review** (Phase 2, only if any F/T spans
    look denser than their own definition allows) -- keep the
    classification or reassign it (F/T/R/C).
+6. **Collocation-pair selection** (Phase 3, only if at least one
+   condensation rate was generated and a real source collocation was
+   found) -- pick one or more ranked, confound-flagged term pairs to
+   compare between the source and each summary. Press ENTER for the
+   top-ranked pair.
 7. **Regenerate a condensation** (Phase 2, after every requested rate has
-   been generated and its reports built) -- would you like to regenerate
-   one? If yes: which rate (an existing one is overwritten in place, a
-   new one is added alongside the rest), whether to adjust the target
-   rate, and whether to add information for the LLM by editing the
-   default prompt (opens it in a scratch file in your editor). Loops
-   back to "regenerate another?" until you decline.
+   been generated, its reports built, and Phase 3 has run) -- would you
+   like to regenerate one? If yes: which rate (an existing one is
+   overwritten in place, a new one is added alongside the rest), whether
+   to adjust the target rate, and whether to add information for the LLM
+   by editing the default prompt (opens it in a scratch file in your
+   editor). Loops back to "regenerate another?" until you decline. Note:
+   this does not re-run Phase 3, so the distant reading report reflects
+   the rates approved at the time it ran, not any later regeneration.
 
 Every choice at every one of these points is logged to
-`data/<corpus>/decisions/phase1_decisions.jsonl` or
-`phase2_decisions.jsonl` -- see README.md's "Interactive review &
+`data/<corpus>/decisions/phase1_decisions.jsonl`, `phase2_decisions.jsonl`,
+or `phase3_decisions.jsonl` -- see README.md's "Interactive review &
 decision log" section for the record schema.
 
 ## Output
 
-Same layout as running the notebooks -- see README.md's "Data directory
-contract". In short, everything lands under `data/<corpus>/`:
-`phase1/` (state JSON, cluster HTML, top stems), `phase2/`
-(informative sentences JSON, and `condensation/` with the condensed
-text, injection report, HTML fragment/preview, human report, plain
-summary, Voyant notebook, and standalone report -- per rate), and
-`decisions/` (the two JSONL decision logs).
+Same layout as running the notebooks (plus Phase 3, which has no
+notebook) -- see README.md's "Data directory contract". In short,
+everything lands under `data/<corpus>/`: `phase1/` (state JSON, cluster
+HTML, top stems), `phase2/` (informative sentences JSON, and
+`condensation/` with the condensed text, injection report, HTML
+fragment/preview, human report, plain summary, and standalone report --
+per rate), `phase3/` (the single distant-reading report HTML), and
+`decisions/` (the three JSONL decision logs).
 
 ## Troubleshooting
 

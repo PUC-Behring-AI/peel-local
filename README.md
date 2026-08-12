@@ -21,7 +21,7 @@ and what calls what), see [FUNCTIONS.md](FUNCTIONS.md).
 
 ## Pipeline overview
 
-The pipeline runs in three phases, each corpus-specific and each reading
+The pipeline runs in four phases, each corpus-specific and each reading
 its input from the previous phase's output (see
 [Data directory contract](#data-directory-contract) below):
 
@@ -47,14 +47,29 @@ its input from the previous phase's output (see
    corpus to a chosen target rate, and verifies that condensation --
    classifying every non-verbatim span by injection risk, scanning for
    verbatim overlap with the source, and checking per-cluster term
-   coverage -- before exporting a Spyral-paste-ready HTML report. See
+   coverage -- before exporting a standalone HTML report. See
    [Phase 2 condensation & injection review](#phase-2-condensation--injection-review)
    below.
+4. **Phase 3 -- Distant reading & source-vs-summary comparison**
+   (`phase3/pipeline.py`, run automatically as part of `run_pipeline.py`
+   or the web interface -- no notebook of its own): a self-contained,
+   Python-native reimplementation of the "distant reading" analyses a
+   separate, Voyant-based PEEL system once relied on an external hosted
+   tool for. Builds a word cloud, a per-cluster prevalence chart, a
+   recurring-phrase table, and a term frequency/distribution-shape table
+   over the source alone, plus -- for every approved Phase 2 condensation
+   rate -- a document-profile table, cluster-coverage comparison, word
+   clouds, and keyword-in-context concordances comparing the source
+   against each summary for a researcher-confirmed collocation pair
+   (found by actually scanning the source for terms that co-occur, never
+   guessed). Everything is written to one standalone HTML file; nothing
+   is uploaded anywhere. See
+   [Phase 3 distant reading](#phase-3-distant-reading) below.
 
 Some stems may not exist in WordNet, and clusters HDBSCAN considers noise
 are automatically re-clustered before being discarded. GPU execution is
-recommended for Phase 1 (GlossBERT + embeddings); Phase 0 and Phase 2 run
-fine on CPU.
+recommended for Phase 1 (GlossBERT + embeddings); Phase 0, Phase 2, and
+Phase 3 run fine on CPU.
 
 ---
 
@@ -86,8 +101,8 @@ pip install -r requirements.txt
 
 which covers: `torch`, `transformers`, `sentence-transformers` (Phase 1
 WSD/embeddings), `spacy`, `nltk` (core NLP), `hdbscan` (clustering),
-`numpy`, `tqdm`, `requests` (general), and `flask` (the
-[web interface](#web-interface)).
+`scipy`, `wordcloud` (Phase 3 distant reading), `numpy`, `tqdm`,
+`requests` (general), and `flask` (the [web interface](#web-interface)).
 
 Phase 2's condensation step also requires [Ollama](https://ollama.com)
 installed separately (not a pip package) -- see
@@ -166,21 +181,19 @@ data/<CORPUS_NAME>/
 │       ├── <CORPUS_NAME>-condensed-<rate>pct-preview.html
 │       ├── <CORPUS_NAME>-condensed-<rate>pct-report.txt
 │       ├── <CORPUS_NAME>-condensed-<rate>pct-summary.txt
-│       ├── <CORPUS_NAME>-voyant-notebook-<rate>pct.html
 │       └── <CORPUS_NAME>-standalone-report-<rate>pct.html
+├── phase3/
+│   └── <CORPUS_NAME>-distant-reading-report.html
 └── decisions/
     ├── phase1_decisions.jsonl      # see "Interactive review & decision log" below
-    └── phase2_decisions.jsonl
+    ├── phase2_decisions.jsonl
+    └── phase3_decisions.jsonl
 ```
 
 `data/` is git-ignored (generated/corpus-specific content shouldn't pile
 up in version control), with one deliberate exception: `data/Boisseau/phase1/*`
 is committed as a worked example, carried over from this repo's earlier
 `phase1/results/` folder.
-
-Cross-corpus, non-generated resources (the Voyant Spyral template and the
-smart-stopword list used in Phase 1's Voyant-settings step) live in
-`resources/`, not under `data/`.
 
 ---
 
@@ -210,15 +223,19 @@ Example using the `Boisseau` corpus already included under
 
 To analyze a new corpus, place its raw text at
 `data/<CORPUS_NAME>/raw/<CORPUS_NAME>.txt` and set `CORPUS_NAME`
-accordingly in both notebooks.
+accordingly in both notebooks. Phase 3 has no notebook of its own -- it
+only runs as part of `run_pipeline.py` or the web interface, immediately
+after Phase 2's initial condensation rates (if any) are built. See
+[Phase 3 distant reading](#phase-3-distant-reading) below.
 
 ### All at once: `run_pipeline.py`
 
 For a new corpus, `run_pipeline.py` at the repo root runs Phase 0
-(optional) -> Phase 1 -> Phase 2 -> Voyant export in a single command,
-with the exact same interactive prompts, outputs, and decision logs as
-running the three notebooks by hand (it calls the same
-`pipeline.py`/`condense.py`/`condensation_report.py`/`voyant_notebook.py`
+(optional) -> Phase 1 -> Phase 2 -> Phase 3 -> standalone report export
+in a single command, with the exact same interactive prompts, outputs,
+and decision logs as running the two notebooks by hand plus Phase 3's
+own automatic step (it calls the same
+`pipeline.py`/`condense.py`/`condensation_report.py`/`standalone_report.py`
 functions -- nothing is reimplemented):
 
 ```bash
@@ -329,22 +346,13 @@ once per corpus run and reused for every rate and any later
 regeneration.
 
 **Output**, per rate, under `data/<CORPUS_NAME>/phase2/condensation/`: the
-condensed text, an injection-report JSON, a Spyral-compatible HTML
-fragment (inline styles only, no `<style>`/classes), a standalone
-browser-preview HTML, a plain-text verification report, a markup-free
-plain-text summary, and a **filled Voyant notebook**
-(`<CORPUS_NAME>-voyant-notebook-<rate>pct.html`) -- `resources/PEEL-TemplateSN.html`
-with its condensation, Phase 1 cluster results, and `incList`/`excListFull`
-JS configuration cell already filled in from this run's results, ready to
-upload into Voyant as-is (see `common/voyant_notebook.py`; the shared
-template itself is never modified). A few of the template's cells are
-deliberately left as-is: the bibliographic citation placeholder (no data
-available for it) and the open-ended tool-exploration/notes cells, which
-are for the researcher's own use inside Voyant. Alongside it, a
+condensed text, an injection-report JSON, an HTML fragment (inline styles
+only, no `<style>`/classes), a standalone browser-preview HTML, a
+plain-text verification report, a markup-free plain-text summary, and a
 **standalone report** (`<CORPUS_NAME>-standalone-report-<rate>pct.html`)
-shows the same information -- condensation, Phase 1 cluster results, and
-a run summary -- as its own cleanly styled page, for anyone who doesn't
-use Voyant (see `common/standalone_report.py`).
+showing the same information -- condensation, Phase 1 cluster results,
+and a run summary -- as its own cleanly styled, self-contained page (see
+`common/standalone_report.py`).
 
 Every choice made in this flow (rates, model, trial outcomes, escalation,
 reclassifications) is logged to `data/<CORPUS_NAME>/decisions/phase2_decisions.jsonl`,
@@ -366,19 +374,97 @@ default prompt doesn't include.
 
 ---
 
+## Phase 3 distant reading
+
+Runs automatically right after Phase 2's initial condensation rates (if
+any) are built and their reports saved -- a Python-native, self-contained
+reimplementation of the "distant reading" analyses a separate,
+Voyant-based PEEL system this repo doesn't use once relied on an
+external hosted tool for. No upload, no manual ID round-trips, no
+notebook to open: everything lands in one standalone HTML file,
+`data/<CORPUS_NAME>/phase3/<CORPUS_NAME>-distant-reading-report.html`.
+
+**Stopwords.** Before anything else, a comprehensive stopword set is
+built for the word clouds and frequency tables below: spaCy's built-in
+English stopword list, plus numerals (including citation-year variants
+like `2024a`), common citation abbreviations (`et`, `al`, `ibid`, ...),
+and any name spaCy tags as a person mentioned 3 or more times (an
+automatic proxy for "probably a cited author," disclosed in the
+report's Provenance section rather than treated as a silent default --
+unlike a researcher-confirmed judgment call, this can have false
+positives).
+
+**Distant reading (source only):**
+- **Word cloud** -- corpus term frequency, stopword-filtered.
+- **Cluster prevalence chart** -- each Phase 1 cluster's stem/n-gram hit
+  count across 5 sequential segments of the source, as a line chart.
+- **Recurring phrases** -- 2-5 word n-grams, frequency-ranked, with
+  shorter grams dropped when they're fully contained in a more frequent
+  longer one.
+- **Term frequency & distribution shape** -- for every cluster-significant
+  term: raw/relative frequency, plus *peakedness* (kurtosis) and
+  *skewness* (skew) of its per-segment frequency vector -- how
+  concentrated vs. evenly spread, and front-loaded vs. back-loaded, each
+  term's usage is across the source.
+- **Full text, highlighted** -- every occurrence of a cluster stem/n-gram
+  marked and colour-coded by cluster (the same token-level stem/lemma
+  matching used elsewhere in this pipeline, not a regex approximation).
+
+**Collocation-pair selection (interactive, only if at least one
+condensation rate was approved).** The source text is scanned for pairs
+of significant terms, drawn from different clusters, that actually
+co-occur within 5 token positions of each other -- ranked by real hit
+count, and flagged when one term's own frequency is disproportionate (a
+possible base-rate confound, not a real relationship: a term that
+appears in nearly every sentence will co-occur with almost anything).
+You pick one or more pairs from this ranked, flagged list -- never an
+automatic top-score pick, since the confound flag is a heuristic, not a
+verdict. If no real collocation is found among the cluster-significant
+terms, this step -- and the Contexts/Collocates comparison below -- is
+skipped.
+
+**Source vs. Summary (only if at least one condensation rate was
+approved):**
+- **Document profile** -- word count, unique-word count, and lexical
+  density for the source and every approved summary, side by side.
+- **Cluster coverage** -- reuses `condense.py`'s own
+  `compute_cluster_coverage()` (the same OK/WARN/DARK comparison Phase 2's
+  own condensation report already shows per rate), so the source-vs-summary
+  question isn't answered twice by two different mechanisms.
+- **Word clouds** -- one per document (source, then each summary).
+- **Contexts** -- a keyword-in-context concordance for each selected
+  collocation pair, run separately per document, so you can see whether
+  and how a real source collocation survives into each summary.
+- **Collocates** -- a co-occurrence table (term, count, anchor-term
+  occurrences) for the first selected pair's first term, per document.
+
+**A disclosed limitation, matching the same choice `run_pipeline.py`'s
+condensation regeneration already makes for its own reports:** Phase 3
+runs once, using whatever rates are approved at that point. A later
+post-completion condensation regeneration does not retroactively rebuild
+this report.
+
+Every choice (the collocation-pair selection) is logged to
+`data/<CORPUS_NAME>/decisions/phase3_decisions.jsonl`, same schema as
+Phase 1/Phase 2's decision logs.
+
+---
+
 ## Web interface
 
 `webapp/` wraps `run_pipeline.py`'s exact same flow -- Phase 0 (optional)
--> Phase 1 -> Phase 2 -> Voyant + standalone export -- behind a browser
-UI: a file-upload form with every config field from the CLI (percentiles,
-stem/cluster limits, model names, ...), and every interactive decision
-point (flagged-term review, cluster review, Voyant settings, condensation
-setup, escalation, borderline-classification review) as a form instead of
-a terminal prompt -- dropdowns, checkboxes, and Yes/No buttons. It calls
-the exact same `phase1/pipeline.py`/`phase2/pipeline.py`/`phase2/condense.py`/
-`phase2/condensation_report.py`/`common/voyant_notebook.py`/
-`common/standalone_report.py` functions the notebooks and `run_pipeline.py`
-call -- nothing about the pipeline itself is reimplemented for the web UI.
+-> Phase 1 -> Phase 2 -> Phase 3 -> standalone report export -- behind a
+browser UI: a file-upload form with every config field from the CLI
+(percentiles, stem/cluster limits, model names, ...), and every
+interactive decision point (flagged-term review, cluster review,
+condensation setup, escalation, borderline-classification review,
+collocation-pair selection) as a form instead of a terminal prompt --
+dropdowns, checkboxes, and Yes/No buttons. It calls the exact same
+`phase1/pipeline.py`/`phase2/pipeline.py`/`phase2/condense.py`/
+`phase2/condensation_report.py`/`phase3/pipeline.py`/
+`common/standalone_report.py` functions the notebooks and
+`run_pipeline.py` call -- nothing about the pipeline itself is
+reimplemented for the web UI.
 
 ### Starting it
 
@@ -415,25 +501,26 @@ it resumes the pipeline in the background.
    sentence, default vs. predicted definition, and a choice control
    (keep default / use predicted / pick a candidate / manual entry);
    plus a "use predicted for all" quick action. All rows submitted together.
-4. **Cluster review** -- one card per cluster: editable name, a checkbox
-   per stem and n-gram (uncheck to remove), and a secondary "also
-   exclude globally" checkbox next to each unchecked stem.
-5. **Voyant settings** -- a Phase 1 summary, corpus-ID field, and a
-   Yes/No toggle for the `en_smart` stopword list.
-6. **Phase 2 setup** -- `top_n`/density-percentile fields, a "generate a
+4. **Cluster review** -- one card per cluster: editable name, and a
+   checkbox per stem and n-gram (uncheck to remove).
+5. **Phase 2 setup** -- `top_n`/density-percentile fields, a "generate a
    condensation?" Yes/No toggle, and (if yes) rate(s), an Ollama model
    dropdown (populated live from Ollama, with an availability check),
    max trials, and the source's title/author(s)/date -- three optional
    text fields, or a checkbox to have the model determine them instead.
-7. **Escalation** (only if triggered) -- per rate that missed its target
+6. **Escalation** (only if triggered) -- per rate that missed its target
    word count: the trial results and a Yes/No "retry with full source
    text?" button.
-8. **Borderline classification review** (only if any exist) -- per
+7. **Borderline classification review** (only if any exist) -- per
    flagged span: the text, the reason it was flagged, and
    `[Keep] [F] [T] [R] [C]` buttons.
+8. **Collocation-pair selection** (Phase 3, only if a condensation was
+   generated and a real source collocation was found) -- a table of
+   ranked, confound-flagged term pairs; check one or more, then submit.
 9. **Complete** -- links to every generated file (Phase 1 outputs, both
-   decision logs, and per-rate condensation/Voyant/standalone-report
-   files), served straight from the browser, plus a **"Regenerate a
+   decision logs, the Phase 3 distant reading report, and per-rate
+   condensation/standalone-report files), served straight from the
+   browser, plus a **"Regenerate a
    condensation"** panel: a rate field (existing rate = overwrite in
    place, new rate = add alongside the rest) and a "Preview / edit
    default prompt" button that reveals the full rendered prompt in an
@@ -461,7 +548,7 @@ that already has a `phase1_state.json`, use `phase2/phase2.ipynb` or
 
 ## Interactive review & decision log
 
-Phase 1 has three points where you make interpretive calls:
+Phase 1 has two points where you make interpretive calls:
 
 1. **Flagged term review** -- for each stem/word whose GlossBERT-predicted
    sense disagrees with WordNet's default sense, accept the prediction,
@@ -472,10 +559,7 @@ Phase 1 has three points where you make interpretive calls:
    candidate list respects your configured `max_synsets` (previously
    capped at 3 regardless of that setting).
 2. **Cluster review** -- accept, rename, or edit each semantic cluster:
-   remove stems or n-grams from it, and optionally exclude removed stems
-   globally.
-3. **Voyant settings** -- enter a Voyant corpus ID and choose whether to
-   apply Voyant's `en_smart` stopword list.
+   remove stems or n-grams from it.
 
 The final `<CORPUS_NAME>-phase1_state.json` only records the *outcome* of
 these steps. Every individual choice is also appended, as it happens, to
@@ -488,7 +572,7 @@ show it. Each line is a JSON object:
 |---|---|
 | `timestamp` | ISO-8601 UTC time the decision was recorded |
 | `corpus`, `phase` | which corpus/phase this belongs to |
-| `step` | review point (`flagged_term_review`, `cluster_review`, `voyant_settings`) |
+| `step` | review point (`flagged_term_review`, `cluster_review`; Phase 2/3 keep their own logs with the same schema, e.g. `condensation_setup`, `injection_review`, `collocation_review`) |
 | `decision_type` | specific sub-decision (e.g. `per_term_choice`, `stem_removal`) |
 | `prompt` | the exact prompt text shown |
 | `options` | the menu/candidates presented, if any |
@@ -507,16 +591,18 @@ peel-local/
 ├── README.md
 ├── FUNCTIONS.md       # function-by-function map of the codebase
 ├── RUN_PIPELINE_GUIDE.md  # detailed run_pipeline.py CLI guide
-├── run_pipeline.py    # Phase 0 (optional) -> 1 -> 2 -> Voyant export, one command
+├── run_pipeline.py    # Phase 0 (optional) -> 1 -> 2 -> 3 -> standalone report export, one command
 ├── requirements.txt
 ├── .gitignore
 ├── common/            # shared modules: data-directory contract, decision log,
-│                       # Ollama client, Voyant notebook auto-fill, standalone report
+│                       # Ollama client, standalone report
 ├── phase0/            # phase0.ipynb + clean_corpus.py -- corpus cleaning
 ├── phase1/            # phase1.ipynb + pipeline.py -- stems, WSD, clustering
 ├── phase2/            # phase2.ipynb + pipeline.py (sentence selection) +
 │                       # condense.py + condensation_report.py (condensation)
+├── phase3/            # pipeline.py (orchestration) + distant_reading.py +
+│                       # comparison.py + collocations.py + stopwords.py +
+│                       # terms.py + report.py -- distant reading, no notebook
 ├── webapp/            # Flask web interface -- app.py, pipeline_session.py, static/
-├── resources/         # shared, cross-corpus assets (Voyant template, stopwords)
 └── data/              # per-corpus inputs/outputs (git-ignored, see contract above)
 ```

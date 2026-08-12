@@ -1,13 +1,12 @@
-"""Renders condense.py's condensation + classification results into a
-Spyral-paste-ready HTML fragment, a standalone browser preview, a
-plain-text verification report, and a markup-free plain summary.
+"""Renders condense.py's condensation + classification results into an
+HTML fragment, a standalone browser preview, a plain-text verification
+report, and a markup-free plain summary.
 
 CRITICAL -- FRAGMENT-FIRST: the primary output (`build_condensation_fragment`)
 is an HTML *fragment*: no <!DOCTYPE>, <html>, <head>, <body>, <style> block,
 or CSS class names. Every visual property is a style="..." attribute. This
-is the only format that survives being pasted into a Voyant Spyral HTML
-cell (see resources/PEEL-TemplateSN.html, which has a literal "PASTE TEXT
-CONDENSATION HERE" placeholder for exactly this).
+is what lets common/standalone_report.py embed it as-is into its own
+page without any style collisions.
 """
 
 import html

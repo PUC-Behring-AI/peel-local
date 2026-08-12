@@ -542,12 +542,15 @@ def print_raw_clusters(clusters, title="CLUSTERS"):
         print()
 
 
-def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, model, device,
-                              pos_map=POS_MAP, max_cluster_size=10, min_clusters=5,
-                              min_cluster_len=3, max_synsets=5):
-    """Splits any cluster larger than max_cluster_size into finer-grained
-    subclusters using richer (word + context + candidate-sense) text
-    representations. Returns (updated_clusters, large_subclusters)."""
+def _split_oversized_clusters_once(clusters, stem_occurrences, embedder, tokenizer, model, device,
+                                    pos_map, max_cluster_size, min_clusters, min_cluster_len, max_synsets):
+    """One leaf-mode HDBSCAN splitting pass -- see recluster_large_clusters,
+    which calls this repeatedly. A single pass isn't guaranteed to bring
+    every resulting piece under max_cluster_size (leaf-mode HDBSCAN can
+    still settle on one comparatively large leaf alongside several small
+    ones, e.g. observed splitting a real 147-stem cluster into pieces of
+    31/5/10/7/5 -- the 31 needed a second pass), which is exactly what
+    the wrapper's loop is for."""
     large_clusters = {label: stems for label, stems in clusters.items() if len(set(stems)) > max_cluster_size}
     if not large_clusters:
         return dict(clusters), {}
@@ -614,6 +617,71 @@ def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, mo
             next_cluster_label += 1
 
     return updated_clusters, large_subclusters
+
+
+def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, model, device,
+                              pos_map=POS_MAP, max_cluster_size=10, min_clusters=5,
+                              min_cluster_len=3, max_synsets=5, max_passes=5):
+    """Splits any cluster larger than max_cluster_size into finer-grained
+    subclusters using richer (word + context + candidate-sense) text
+    representations. Returns (updated_clusters, all_subclusters).
+
+    Runs the splitting pass (_split_oversized_clusters_once) repeatedly
+    rather than just once -- a single leaf-mode HDBSCAN pass is not
+    guaranteed to bring every piece under max_cluster_size (verified on
+    real data: a 147-stem cluster's first split left a 31-stem piece
+    still over a max_cluster_size of 10) -- but repeating the exact same
+    call on data it already failed to split just reproduces the same
+    result (HDBSCAN isn't randomized here): re-running
+    _split_oversized_clusters_once with an unchanged min_cluster_size on
+    a cluster it left alone finds "1 leaf, not promoted" again, every
+    time, because nothing about the question changed. So each retry pass
+    that makes no progress lowers the HDBSCAN min_cluster_size floor by
+    1 (never below min_cluster_len) before trying again -- an actually
+    looser question, not the same one repeated -- and stops once nothing
+    is left oversized, once min_cluster_size can't drop any further, or
+    once max_passes is reached. A cluster can still come out of this
+    function over max_cluster_size if the data genuinely doesn't
+    separate even at the loosest threshold tried; callers that care
+    should check the returned clusters' sizes (find_oversized_clusters)
+    rather than assume the cap was met."""
+    updated_clusters = dict(clusters)
+    all_subclusters = {}
+    current_min_clusters = min_clusters
+    for pass_num in range(max_passes):
+        if not find_oversized_clusters(updated_clusters, max_cluster_size):
+            break
+        if current_min_clusters < min_cluster_len:
+            break
+
+        next_clusters, subclusters = _split_oversized_clusters_once(
+            updated_clusters, stem_occurrences, embedder, tokenizer, model, device,
+            pos_map=pos_map, max_cluster_size=max_cluster_size, min_clusters=current_min_clusters,
+            min_cluster_len=min_cluster_len, max_synsets=max_synsets,
+        )
+
+        if next_clusters == updated_clusters:
+            # No structural change at this threshold -- loosen it before
+            # trying again instead of repeating an identical computation.
+            current_min_clusters -= 1
+            continue
+
+        updated_clusters = next_clusters
+        # HDBSCAN's own labels are only unique within one pass -- prefix
+        # by pass number so successive passes' subclusters don't collide
+        # and silently overwrite each other in the merged report dict.
+        all_subclusters.update({f"{pass_num}.{label}": stems for label, stems in subclusters.items()})
+    return updated_clusters, all_subclusters
+
+
+def find_oversized_clusters(clusters, max_cluster_size):
+    """Clusters still over max_cluster_size after recluster_large_clusters
+    -- can legitimately happen (see that function's docstring) when the
+    data just doesn't separate into smaller pieces within max_passes.
+    Callers should surface this rather than let it pass silently, same
+    principle as sanity_failed/soft_accept elsewhere in this codebase:
+    never silently discard the fact that a limit wasn't actually met."""
+    return {label: stems for label, stems in clusters.items() if len(set(stems)) > max_cluster_size}
 
 
 def extract_noise_stems(stem_names, labels):
@@ -823,25 +891,17 @@ def parse_index_selection(raw_input, items):
 
 def run_cluster_review(renamed_clusters, decisions):
     """Interactive per-cluster review: accept as-is, rename/remove
-    stems/remove n-grams/globally exclude removed stems, or drop the
-    whole cluster entirely (its stems stay eligible for incList via
-    all_original_stems below, unless also added to excList when
-    dropping). Every choice is appended to the decisions log via
-    `decisions.record(...)` for later audit -- it does not change the
-    interactive flow. Shared by phase1.ipynb and run_pipeline.py so
-    there's one implementation, not two. Returns (final_clusters,
-    excluded_cluster_stems, excluded_cluster_ngrams, all_original_stems)."""
+    stems/remove n-grams, or drop the whole cluster entirely. Every
+    choice is appended to the decisions log via `decisions.record(...)`
+    for later audit -- it does not change the interactive flow. Shared by
+    phase1.ipynb and run_pipeline.py so there's one implementation, not
+    two. Returns (final_clusters, excluded_cluster_ngrams)."""
     print("\n======================")
     print("CLUSTER REVIEW")
     print("======================\n")
 
     final_clusters = {}
-    excluded_cluster_stems = set()
     excluded_cluster_ngrams = set()
-
-    all_original_stems = set()
-    for cluster_data in renamed_clusters.values():
-        all_original_stems.update(cluster_data["stems"])
 
     for cluster_name in sorted(renamed_clusters.keys()):
 
@@ -896,30 +956,10 @@ def run_cluster_review(renamed_clusters, decisions):
 
         if accept == "d":
 
-            print("\nStems in this cluster:")
-            for i, stem in enumerate(stems, 1):
-                print(f"{i}. {stem}")
-
-            exclude_input = input(
-                "\nWhich of these stems should also be added to excList?\n"
-                "(comma-separated numbers, 'all', or ENTER for none): "
-            ).strip()
-
-            globally_excluded = []
-
-            try:
-                _, globally_excluded = parse_index_selection(exclude_input, stems)
-            except ValueError:
-                print("\nInvalid exclusion input.")
-                print("No stems added to excList.")
-
-            excluded_cluster_stems.update(globally_excluded)
-
             decisions.record(
                 step="cluster_review", decision_type="drop_cluster",
-                prompt="Which stems should also be globally excluded?",
-                options=stems, choice=exclude_input,
-                extra={"cluster_name": cluster_name, "globally_excluded": globally_excluded},
+                prompt="Cluster dropped entirely", choice="d",
+                extra={"cluster_name": cluster_name},
             )
 
             print(f"\nCluster '{cluster_name}' dropped entirely.")
@@ -962,32 +1002,9 @@ def run_cluster_review(renamed_clusters, decisions):
         )
 
         if removed_stems:
-
             print("\nRemoved stems:")
             for i, stem in enumerate(removed_stems, 1):
                 print(f"{i}. {stem}")
-
-            exclude_input = input(
-                "\nWhich removed stems should also be added to excList?\n"
-                "(comma-separated numbers or ENTER for none): "
-            ).strip()
-
-            globally_excluded = []
-
-            try:
-                _, globally_excluded = parse_index_selection(exclude_input, removed_stems)
-            except ValueError:
-                print("\nInvalid exclusion input.")
-                print("No stems added to excList.")
-
-            excluded_cluster_stems.update(globally_excluded)
-
-            decisions.record(
-                step="cluster_review", decision_type="global_exclusion",
-                prompt="Which removed stems should also be globally excluded?",
-                options=removed_stems, choice=exclude_input,
-                extra={"globally_excluded": globally_excluded},
-            )
 
         final_clusters[new_name] = {
             "stems": updated_stems,
@@ -1023,66 +1040,15 @@ def run_cluster_review(renamed_clusters, decisions):
 
         print()
 
-    return final_clusters, excluded_cluster_stems, excluded_cluster_ngrams, all_original_stems
-
-
-# ============================================================
-# VOYANT SETTINGS
-# ============================================================
-
-def read_smart_stopwords(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
-
-
-def run_voyant_settings(decisions, stopwords_path):
-    """Interactive Voyant-settings prompts: corpus ID + whether to apply
-    Voyant's en_smart stopword list. Every choice is appended to the
-    decisions log via `decisions.record(...)` for later audit -- it does
-    not change the interactive flow. Shared by phase1.ipynb and
-    run_pipeline.py so there's one implementation, not two. Returns
-    (corpus_id, smart_stopwords, use_smart_stopwords)."""
-    print("\n======================")
-    print("VOYANT CORPUS")
-    print("======================\n")
-
-    corpus_id = input("Enter Voyant Corpus ID: ").strip()
-
-    decisions.record(
-        step="voyant_settings", decision_type="corpus_id_entry",
-        prompt="Enter Voyant Corpus ID", choice=corpus_id,
-    )
-
-    use_smart_stopwords_input = input("\nUse Voyant en_smart stopwords? (y/n): ").strip().lower()
-    use_smart_stopwords = use_smart_stopwords_input == "y"
-
-    decisions.record(
-        step="voyant_settings", decision_type="stopword_toggle",
-        prompt="Use Voyant en_smart stopwords?", options=["y", "n"],
-        choice=use_smart_stopwords_input,
-    )
-
-    smart_stopwords = []
-    if use_smart_stopwords:
-        smart_stopwords = read_smart_stopwords(stopwords_path)
-
-    return corpus_id, smart_stopwords, use_smart_stopwords
+    return final_clusters, excluded_cluster_ngrams
 
 
 # ============================================================
 # EXPORT
 # ============================================================
 
-def build_phase1_state(corpus_id, all_original_stems, excluded_cluster_stems, excluded_cluster_ngrams,
-                        final_clusters, smart_stopwords, use_smart_stopwords):
-    full_exc_list = set(excluded_cluster_stems)
-    if use_smart_stopwords:
-        full_exc_list.update(smart_stopwords)
-
+def build_phase1_state(final_clusters, excluded_cluster_ngrams):
     return {
-        "corpusId": corpus_id,
-        "incList": sorted(all_original_stems - excluded_cluster_stems),
-        "excList": sorted(full_exc_list),
         "excludedNgrams": sorted(excluded_cluster_ngrams),
         "clusterDefs": [
             {

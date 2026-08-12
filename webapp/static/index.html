@@ -10,7 +10,7 @@
 
 <header class="app-header">
   <h1>PEEL-Local</h1>
-  <p>Interactive pipeline: Phase 0 (optional) &rarr; Phase 1 &rarr; Phase 2 &rarr; Voyant + standalone export.
+  <p>Interactive pipeline: Phase 0 (optional) &rarr; Phase 1 &rarr; Phase 2 &rarr; Phase 3 (distant reading) &rarr; standalone export.
      See <a href="../RUN_PIPELINE_GUIDE.md" target="_blank">RUN_PIPELINE_GUIDE.md</a> for the CLI equivalent.</p>
 </header>
 
@@ -121,34 +121,10 @@
   <section id="screen-cluster-review" class="screen hidden">
     <h2>Cluster review</h2>
     <p class="hint">Uncheck a stem or n-gram to remove it from its cluster, or use a cluster's "remove all
-       stems"/"remove all n-grams" button. Rename a cluster by editing its name. Removed stems can also be
-       excluded globally (added to <code>excList</code>).</p>
+       stems"/"remove all n-grams" button. Rename a cluster by editing its name.</p>
     <button type="button" class="primary submit-cluster-review">Submit decisions</button>
     <div id="cluster-review-list"></div>
     <button type="button" class="primary submit-cluster-review">Submit decisions</button>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- VOYANT SETTINGS -->
-  <!-- ============================================================ -->
-  <section id="screen-voyant-settings" class="screen hidden">
-    <h2>Voyant settings</h2>
-    <p id="voyant-summary" class="hint"></p>
-    <form id="voyant-form">
-      <div class="field">
-        <label for="corpus_id">Voyant corpus ID</label>
-        <input type="text" id="corpus_id" name="corpus_id" placeholder="leave blank if not uploaded to Voyant yet">
-      </div>
-      <div class="field">
-        <label>Use Voyant <code>en_smart</code> stopword list?</label>
-        <div class="yesno">
-          <button type="button" class="yesno-btn" data-value="true">Yes</button>
-          <button type="button" class="yesno-btn selected" data-value="false">No</button>
-        </div>
-        <input type="hidden" id="use_smart_stopwords" value="false">
-      </div>
-      <button type="submit" class="primary">Finish Phase 1 &amp; continue</button>
-    </form>
   </section>
 
   <!-- ============================================================ -->
@@ -195,22 +171,22 @@
           <input type="number" id="max_trials" name="max_trials" value="3" step="1" min="1">
         </div>
 
-        <div class="field checkbox-field">
-          <label><input type="checkbox" id="auto_detect_metadata"> Let the LLM determine the source's title/author(s)/date</label>
-          <p class="hint">Retrieval-augmented: retrieves the source passages most likely to contain this information and asks the model to extract it. Any field it isn't confident about comes back "Unclear".</p>
+        <div class="field">
+          <label>Source title / author(s) / date</label>
+          <p id="metadata-status" class="hint">Detecting with AI&hellip;</p>
         </div>
         <div id="metadata-fields" class="grid">
           <div class="field">
             <label for="source_title">Source title</label>
-            <input type="text" id="source_title" name="title" placeholder="leave blank for Unclear">
+            <input type="text" id="source_title" name="title" placeholder="Unclear">
           </div>
           <div class="field">
             <label for="source_authors">Source author(s)</label>
-            <input type="text" id="source_authors" name="authors" placeholder="leave blank for Unclear">
+            <input type="text" id="source_authors" name="authors" placeholder="Unclear">
           </div>
           <div class="field">
             <label for="source_date">Source date</label>
-            <input type="text" id="source_date" name="date" placeholder="leave blank for Unclear">
+            <input type="text" id="source_date" name="date" placeholder="Unclear">
           </div>
         </div>
       </div>
@@ -220,12 +196,27 @@
   </section>
 
   <!-- ============================================================ -->
+  <!-- SANITY-CHECK REVIEW -->
+  <!-- ============================================================ -->
+  <section id="screen-sanity-review" class="screen hidden">
+    <h2>Sanity-check review</h2>
+    <p class="hint">These trials hit their target word count but failed a generation sanity
+       check (a heuristic -- e.g. a repeated-phrase detector -- not a confirmed error). Pick
+       one to keep for each rate below, or reject all of them to fall back to escalation.</p>
+    <button type="button" class="primary submit-sanity-review">Submit decisions</button>
+    <div id="sanity-review-list"></div>
+    <button type="button" class="primary submit-sanity-review">Submit decisions</button>
+  </section>
+
+  <!-- ============================================================ -->
   <!-- ESCALATION -->
   <!-- ============================================================ -->
   <section id="screen-escalation" class="screen hidden">
     <h2>Condensation escalation</h2>
-    <p class="hint">These rates didn't hit their target word count within the trial limit.
-       Retry with the full source text included in the prompt?</p>
+    <p class="hint">These rates didn't produce a trial that both hit the target word count
+       <em>and</em> passed the generation sanity checks within the trial limit -- see each
+       trial's notes below for which one it was. Retry with the full source text included
+       in the prompt?</p>
     <button type="button" class="primary submit-escalation">Submit decisions</button>
     <div id="escalation-list"></div>
     <button type="button" class="primary submit-escalation">Submit decisions</button>
@@ -237,10 +228,45 @@
   <section id="screen-injection-review" class="screen hidden">
     <h2>Borderline classification review</h2>
     <p class="hint">These spans were classified F/T but look denser than that type's own definition allows.
-       Keep the classification, or reassign it.</p>
+       The matched source sentence(s) are shown alongside each span so you can judge the call without
+       switching to the source text. Keep the classification, or reassign it.</p>
     <button type="button" class="primary submit-injection-review">Submit decisions</button>
     <div id="injection-review-list"></div>
     <button type="button" class="primary submit-injection-review">Submit decisions</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- COLLOCATION REVIEW (Phase 3) -->
+  <!-- ============================================================ -->
+  <section id="screen-collocation-review" class="screen hidden">
+    <h2>Phase 3: collocation-pair selection</h2>
+    <p class="hint">These term pairs actually co-occur in the source text (found by scanning for
+       real proximity, not guessed). Pick one or more to compare -- via a keyword-in-context
+       concordance -- between the source and each condensation summary. Rows marked "possibly
+       confounded" involve a disproportionately frequent term, so the co-occurrence may just be
+       base rate -- you can still pick a flagged pair if the specific pairing looks meaningful.</p>
+    <details class="advanced">
+      <summary>How these candidates and flags are chosen</summary>
+      <p class="hint">
+        <strong>Candidates:</strong> for every Phase 1 cluster, its top 6 stems/n-grams by how
+        often they actually occur in the source form the term pool. Every pair of pool terms drawn
+        from two <em>different</em> clusters is checked for real proximity -- a pair only becomes a
+        candidate if the two terms actually sit within 5 tokens of each other somewhere in the
+        source at least once. Candidates are ranked by that co-occurrence count, most first, and
+        capped at the top 20 shown here.
+      </p>
+      <p class="hint">
+        <strong>"Possibly confounded":</strong> unrelated to how often the pair co-occurs. A pair is
+        flagged when the <em>more frequent</em> of its two terms occurs, on its own, at least
+        5&times; the median occurrence count across the whole term pool -- a term that common in
+        the source will sit near almost anything, so a co-occurrence count involving it is weaker
+        evidence of a real contextual link, not necessarily a wrong one. It's a caveat for your
+        judgment, not a verdict: pick a flagged pair if the specific pairing still looks meaningful.
+      </p>
+    </details>
+    <button type="button" class="primary submit-collocation-review">Submit selection</button>
+    <div id="collocation-review-list"></div>
+    <button type="button" class="primary submit-collocation-review">Submit selection</button>
   </section>
 
   <!-- ============================================================ -->

@@ -3,7 +3,7 @@
 This is a fourth way to drive the same pipeline the notebooks and
 run_pipeline.py already run -- it calls the exact same functions in
 phase1/pipeline.py, phase2/pipeline.py, phase2/condense.py,
-phase2/condensation_report.py, common/voyant_notebook.py,
+phase2/condensation_report.py, phase3/pipeline.py,
 common/standalone_report.py. Nothing about the pipeline itself is
 reimplemented here.
 
@@ -36,12 +36,13 @@ import spacy
 import torch
 from nltk.stem import PorterStemmer
 
-from common.paths import CorpusPaths, resources_dir
+from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import voyant_notebook, standalone_report
+from common import standalone_report
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
+from phase3 import pipeline as phase3_pipeline, collocations as phase3_collocations, report as phase3_report
 
 
 class _TeeStream:
@@ -141,15 +142,41 @@ class PipelineSession:
         self.decisions2 = DecisionLog(corpus_name, phase="phase2")
         self.config = config
 
-        if clean:
-            raw_text = file_storage.read().decode("utf-8")
-            cleaned = clean_text(raw_text)
-            with open(self.paths.raw_txt(), "w", encoding="utf-8") as f:
-                f.write(cleaned)
-        else:
-            file_storage.save(str(self.paths.raw_txt()))
+        raw_text = file_storage.read().decode("utf-8")
+        # Kept verbatim (pre-Phase-0) specifically for source-metadata
+        # detection below -- title/author/date front matter sits at the
+        # very start of the document, and Phase 0 cleaning isn't
+        # guaranteed to leave it alone (e.g. a title that also repeats as
+        # a running header gets stripped as a recurring short line), so
+        # detection always reads from this untouched copy rather than
+        # self.text, whether or not cleaning was requested.
+        self._raw_source_text = raw_text
+        with open(self.paths.raw_txt(), "w", encoding="utf-8") as f:
+            f.write(clean_text(raw_text) if clean else raw_text)
 
         self._run_bg(self._step_start_to_flagged_review, "Extracting stems & running GlossBERT analysis")
+
+    def detect_metadata(self, ollama_model):
+        """Runs extract_source_metadata against the untouched pre-Phase-0
+        source text captured in start(), using the given Ollama model.
+        Called by the web UI right as the Phase 2 setup screen loads, so
+        the title/author/date fields open already pre-filled with the
+        model's best guess (or "Unclear") for the researcher to confirm
+        or edit, rather than asking them to type it in blind.
+
+        Printed to the server's own console (real stdout, not the
+        session log the browser polls -- this runs in the Flask request
+        thread, outside _run_bg's tee) since this call has no other
+        visible trail if it silently fails client-side: the researcher
+        only sees a small status line on the form, easy to miss, and the
+        browser's log panel never receives this route's output at all."""
+        print(f"[detect-metadata] request: model={ollama_model!r}")
+        if getattr(self, "_raw_source_text", None) is None:
+            print("[detect-metadata] no corpus loaded yet")
+            raise RuntimeError("No corpus loaded yet.")
+        title, authors, date = condense.extract_source_metadata(self._raw_source_text, ollama_model)
+        print(f"[detect-metadata] result: title={title!r}, authors={authors!r}, date={date!r}")
+        return {"title": title, "authors": authors, "date": date}
 
     # ------------------------------------------------------------
     # PHASE 1: stems -> GlossBERT -> flagged-term review
@@ -268,6 +295,12 @@ class PipelineSession:
             min_cluster_len=self.config["min_cluster_len"], max_synsets=self.config["max_synsets"],
         )
         print(f"{len(large_subclusters)} large-cluster subcluster(s) found.")
+        still_oversized = phase1_pipeline.find_oversized_clusters(self.clusters, self.config["max_cluster_size"])
+        if still_oversized:
+            print(f"WARNING: {len(still_oversized)} cluster(s) are still over max_cluster_size "
+                  f"({self.config['max_cluster_size']}) after splitting -- sizes: "
+                  f"{[len(set(v)) for v in still_oversized.values()]}. The data didn't separate further; "
+                  "review these in the cluster-review step below.")
 
         noise_stems = phase1_pipeline.extract_noise_stems(self.stem_names, self.labels)
         self.noise_clusters = phase1_pipeline.recluster_noise(
@@ -276,6 +309,27 @@ class PipelineSession:
             max_synsets=self.config["max_synsets"],
         )
         print(f"{len(self.noise_clusters)} noise cluster(s) recovered.")
+
+        # recluster_noise's own HDBSCAN pass can just as easily produce an
+        # oversized cluster as the primary pass does (its default
+        # cluster-selection method favors one large stable cluster over
+        # many small ones) -- run its output through the same
+        # max_cluster_size split the primary pass's clusters already got
+        # above, rather than letting it skip that safety net purely
+        # because of which pass produced it.
+        self.noise_clusters, noise_large_subclusters = phase1_pipeline.recluster_large_clusters(
+            self.noise_clusters, self.stem_occurrences, self.embedder, self.tokenizer, self.model, self.device,
+            max_cluster_size=self.config["max_cluster_size"], min_clusters=self.config["min_clusters"],
+            min_cluster_len=self.config["min_cluster_len"], max_synsets=self.config["max_synsets"],
+        )
+        if noise_large_subclusters:
+            print(f"{len(noise_large_subclusters)} oversized noise-recovered subcluster(s) split out.")
+        still_oversized = phase1_pipeline.find_oversized_clusters(self.noise_clusters, self.config["max_cluster_size"])
+        if still_oversized:
+            print(f"WARNING: {len(still_oversized)} noise-recovered cluster(s) are still over "
+                  f"max_cluster_size ({self.config['max_cluster_size']}) after splitting -- sizes: "
+                  f"{[len(set(v)) for v in still_oversized.values()]}. The data didn't separate further; "
+                  "review these in the cluster-review step below.")
 
         stem_word_frequencies = phase1_pipeline.build_stem_word_frequency_table(self.stem_occurrences)
         renamed_clusters = phase1_pipeline.rename_clusters(self.clusters, stem_word_frequencies)
@@ -306,11 +360,9 @@ class PipelineSession:
 
     def apply_cluster_review(self, entries):
         """entries: list of {original_name, removed?, new_name, kept_stems,
-        removed_stems, kept_ngrams, removed_ngrams, globally_excluded_stems}.
-        An entry with removed=true is dropped entirely -- it never appears
-        in final_clusters (mirrors the CLI's "d = drop entirely" option),
-        though any of its stems the user chose to globally exclude still
-        land in excluded_cluster_stems."""
+        removed_stems, kept_ngrams, removed_ngrams}. An entry with
+        removed=true is dropped entirely -- it never appears in
+        final_clusters (mirrors the CLI's "d = drop entirely" option)."""
         self.decisions1.record(
             step="cluster_review", decision_type="batch_review",
             prompt="Cluster review (web batch)",
@@ -319,19 +371,9 @@ class PipelineSession:
         )
 
         final_clusters = {}
-        excluded_cluster_stems = set()
         excluded_cluster_ngrams = set()
 
-        # From every original cluster, not just the ones kept below -- a
-        # stem stays a candidate for incList even if its cluster was
-        # entirely removed, unless explicitly globally excluded.
-        all_original_stems = set()
-        for cluster_data in self.renamed_clusters.values():
-            all_original_stems.update(cluster_data["stems"])
-
         for entry in entries:
-            excluded_cluster_stems.update(entry.get("globally_excluded_stems", []))
-
             if entry.get("removed"):
                 continue
 
@@ -346,54 +388,17 @@ class PipelineSession:
             }
 
         self.final_clusters = final_clusters
-        self.excluded_cluster_stems = excluded_cluster_stems
         self.excluded_cluster_ngrams = excluded_cluster_ngrams
-        self.all_original_stems = all_original_stems
-
-        self._run_bg(
-            lambda: {
-                "type": "voyant_settings",
-                "payload": {
-                    "cluster_count": len(final_clusters),
-                    "stem_count": len(all_original_stems - excluded_cluster_stems),
-                },
-            },
-            "Preparing Voyant settings",
-        )
-
-    # ------------------------------------------------------------
-    # PHASE 1: Voyant settings -> finish & save
-    # ------------------------------------------------------------
-
-    def apply_voyant_settings(self, corpus_id: str, use_smart_stopwords: bool):
-        self.decisions1.record(
-            step="voyant_settings", decision_type="corpus_id_entry",
-            prompt="Enter Voyant Corpus ID", choice=corpus_id, extra={"source": "web"},
-        )
-        self.decisions1.record(
-            step="voyant_settings", decision_type="stopword_toggle",
-            prompt="Use Voyant en_smart stopwords?", options=["y", "n"],
-            choice="y" if use_smart_stopwords else "n", extra={"source": "web"},
-        )
-
-        self.corpus_id = corpus_id
-        self.use_smart_stopwords = use_smart_stopwords
-        self.smart_stopwords = (
-            phase1_pipeline.read_smart_stopwords(resources_dir() / "stop.en.smart.txt")
-            if use_smart_stopwords else []
-        )
 
         self._run_bg(self._step_finish_phase1, "Finishing Phase 1")
 
+    # ------------------------------------------------------------
+    # PHASE 1: finish & save
+    # ------------------------------------------------------------
+
     def _step_finish_phase1(self):
         self.phase1_state = phase1_pipeline.build_phase1_state(
-            corpus_id=self.corpus_id,
-            all_original_stems=self.all_original_stems,
-            excluded_cluster_stems=self.excluded_cluster_stems,
-            excluded_cluster_ngrams=self.excluded_cluster_ngrams,
-            final_clusters=self.final_clusters,
-            smart_stopwords=self.smart_stopwords,
-            use_smart_stopwords=self.use_smart_stopwords,
+            self.final_clusters, self.excluded_cluster_ngrams,
         )
         phase1_pipeline.save_phase1_state(self.phase1_state, self.paths.phase1_state_json())
         print(f"Saved Phase 1 state to {self.paths.phase1_state_json()}")
@@ -416,7 +421,7 @@ class PipelineSession:
 
     def apply_phase2_setup(self, top_n, density_percentile, run_condensation,
                             rates_str, ollama_model, max_trials,
-                            title="", authors="", date="", auto_detect_metadata=False):
+                            title="", authors="", date=""):
         self.decisions2.record(
             step="phase2_setup", decision_type="sentence_selection_config",
             prompt="Phase 2 sentence-selection config",
@@ -428,10 +433,14 @@ class PipelineSession:
         self.density_percentile = density_percentile
         self.run_condensation = run_condensation
         self.rates = []
-        self._metadata_title = title.strip()
-        self._metadata_authors = authors.strip()
-        self._metadata_date = date.strip()
-        self._auto_detect_metadata = auto_detect_metadata
+        # title/authors/date: the browser already ran detect_metadata (an
+        # AI guess against the untouched pre-Phase-0 text, see start())
+        # and pre-filled the form with it before the researcher saw this
+        # screen -- whatever comes back here, edited or not, is the
+        # researcher's confirmed answer, so it's taken as final.
+        self.title = title.strip() or "Unclear"
+        self.authors = authors.strip() or "Unclear"
+        self.date = date.strip() or "Unclear"
 
         if run_condensation:
             self.rates = [int(r.strip()) for r in rates_str.split(",") if r.strip()]
@@ -454,11 +463,10 @@ class PipelineSession:
                 choice=str(max_trials), extra={"source": "web"},
             )
             self.decisions2.record(
-                step="source_metadata", decision_type="mode_choice",
-                prompt="Enter title/author(s)/date manually, or let the LLM determine them?",
-                choice="auto" if auto_detect_metadata else "manual",
-                extra={"source": "web", "title": self._metadata_title,
-                       "authors": self._metadata_authors, "date": self._metadata_date},
+                step="source_metadata", decision_type="metadata_result",
+                prompt="Source title/author(s)/date, confirmed by researcher",
+                choice="confirmed",
+                extra={"source": "web", "title": self.title, "authors": self.authors, "date": self.date},
             )
 
         self._run_bg(self._step_select_sentences_and_generate, "Selecting informative sentences")
@@ -488,30 +496,28 @@ class PipelineSession:
         print(f"Saved informative sentences to {self.paths.phase2_output_json()}")
 
         if not self.run_condensation or not self.rates:
+            self.condensed_texts = {}
             self.manifest = self._empty_manifest()
-            print("Pipeline complete (no condensation requested).")
-            return None
+            print("No condensation requested.")
+            return self._step_prepare_phase3()
 
-        if self._auto_detect_metadata:
-            print("\nExtracting title/author(s)/date from the source text...")
-            self.title, self.authors, self.date = condense.extract_source_metadata(self.text, self.ollama_model)
-            print(f"  Title: {self.title}\n  Author(s): {self.authors}\n  Date: {self.date}")
-        else:
-            self.title = self._metadata_title or "Unclear"
-            self.authors = self._metadata_authors or "Unclear"
-            self.date = self._metadata_date or "Unclear"
-        self.decisions2.record(
-            step="source_metadata", decision_type="metadata_result",
-            prompt="Source title/author(s)/date",
-            choice="auto" if self._auto_detect_metadata else "manual",
-            extra={"source": "web", "title": self.title, "authors": self.authors, "date": self.date},
-        )
+        print(f"\nSource metadata (researcher-confirmed) -- Title: {self.title}; Author(s): {self.authors}; Date: {self.date}")
 
         self.ordered_sentences = condense.gather_ordered_informative_sentences(self.enriched_state)
         self.cluster_key_terms = condense.gather_cluster_key_terms(self.enriched_state)
 
         self.condensed_texts = {}
         self._target_words_by_rate = {}
+        self._escalation_sanity_failed_by_rate = {}
+        # Trials that hit the word-count target but failed a sanity check
+        # are never auto-picked (see attempt_condensation_trials) -- they
+        # go to a researcher review step instead. These two dicts track
+        # what's pending review and which context it came from ("initial"
+        # -> declining offers escalation; "escalated" or "regen" ->
+        # declining just gives up, no further auto-retry).
+        self._sanity_review_pending = {}
+        self._sanity_review_context = {}
+        needs_sanity_review = []
         needs_escalation = []
 
         for rate in self.rates:
@@ -537,11 +543,102 @@ class PipelineSession:
             # better attempt.
             if result["text"] is not None:
                 self.condensed_texts[rate] = result["text"]
-            if not result["success"]:
+
+            if result["sanity_review_candidates"]:
+                self._sanity_review_pending[rate] = result
+                self._sanity_review_context[rate] = "initial"
+                needs_sanity_review.append({"rate": rate, "candidates": self._sanity_candidates_payload(result)})
+            elif not result["success"]:
+                # Kept so a later "decline escalation" can report the real
+                # reason -- a trial can fail here either for missing the
+                # word-count target or for failing the sanity check (e.g.
+                # a repeated-phrase degeneration) even while landing
+                # within tolerance, and those are different situations.
+                self._escalation_sanity_failed_by_rate[rate] = bool(result.get("sanity_failed"))
                 needs_escalation.append({"rate": rate, "trials": result["trials"]})
+
+        # Sanity review always comes first -- a rate rejected there can
+        # still fall through to escalation afterward (see
+        # _step_apply_sanity_review), so escalation for the rest is
+        # deferred rather than decided here.
+        self._deferred_escalation = needs_escalation
+
+        if needs_sanity_review:
+            return {"type": "sanity_review", "payload": {"rates": needs_sanity_review}}
 
         if needs_escalation:
             return {"type": "escalation", "payload": {"rates": needs_escalation}}
+
+        return self._step_injection_analysis()
+
+    def _sanity_candidates_payload(self, result):
+        """Trial number/word-count/target/sanity-issues for each
+        tolerance-hit-but-sanity-failed candidate -- no trial text, same
+        information the CLI's run_sanity_review_for_rate prints. The
+        actual text stays server-side in self._sanity_review_pending
+        until the researcher picks a trial number."""
+        return [
+            {"trial": c["trial"], "word_count": c["word_count"],
+             "target_words": c["target_words"], "sanity_issues": c["sanity_issues"]}
+            for c in result["sanity_review_candidates"]
+        ]
+
+    def apply_sanity_review(self, decisions_by_rate):
+        """decisions_by_rate: {rate: trial_number|None} -- which
+        sanity-flagged trial (if any) to keep for each rate under
+        review."""
+        self.decisions2.record(
+            step="condensation_generation", decision_type="sanity_review_batch",
+            prompt="Sanity-check review decisions (web batch)",
+            choice=f"{len(decisions_by_rate)} rate(s) decided",
+            extra={"source": "web", "decisions": decisions_by_rate},
+        )
+        self._pending_sanity_review = decisions_by_rate
+        self._run_bg(self._step_apply_sanity_review, "Applying sanity-check review decisions")
+
+    def _step_apply_sanity_review(self):
+        needs_escalation = list(getattr(self, "_deferred_escalation", []))
+        regen_accepted_text = None
+
+        for rate_str, trial_choice in self._pending_sanity_review.items():
+            rate = int(rate_str)
+            result = self._sanity_review_pending.pop(rate, None)
+            context = self._sanity_review_context.pop(rate, "initial")
+            if result is None:
+                continue
+
+            candidates = result["sanity_review_candidates"]
+            accepted = None
+            if trial_choice is not None:
+                accepted = next((c for c in candidates if c["trial"] == int(trial_choice)), None)
+
+            if accepted is not None:
+                print(f"\nAccepted trial {accepted['trial']} for {rate}% despite its sanity flag.")
+                if context == "regen":
+                    regen_accepted_text = accepted["text"]
+                else:
+                    self.condensed_texts[rate] = accepted["text"]
+            elif context == "initial":
+                self.condensed_texts.pop(rate, None)
+                self._escalation_sanity_failed_by_rate[rate] = False
+                needs_escalation.append({"rate": rate, "trials": result["trials"]})
+                print(f"\nRejected all sanity-flagged trials for {rate}% -- offering escalation.")
+            elif context == "escalated":
+                self.condensed_texts.pop(rate, None)
+                print(f"\nGiving up on {rate}% -- no condensation accepted after escalation.")
+            else:  # "regen"
+                print(f"\nRegeneration at {rate}% rejected -- previous outputs for this rate, if any, are unchanged.")
+
+        self._deferred_escalation = []
+
+        if needs_escalation:
+            return {"type": "escalation", "payload": {"rates": needs_escalation}}
+
+        if getattr(self, "_regen_rate", None) is not None:
+            if regen_accepted_text is not None:
+                return self._step_regenerate_after_text(self._regen_rate, regen_accepted_text)
+            self._regen_rate = None
+            return None
 
         return self._step_injection_analysis()
 
@@ -557,13 +654,22 @@ class PipelineSession:
         self._run_bg(self._step_apply_escalation, "Escalated condensation generation")
 
     def _step_apply_escalation(self):
+        needs_sanity_review = []
+
         for rate_str, escalate in self._pending_escalation.items():
             rate = int(rate_str)
             if not escalate:
                 if rate in self.condensed_texts:
-                    print(f"\nKeeping the closest non-escalated trial for {rate}% (not within tolerance).")
+                    if self._escalation_sanity_failed_by_rate.get(rate):
+                        print(f"\nKeeping the closest non-escalated trial for {rate}% "
+                              "(it failed a generation sanity check, e.g. a repeated-phrase "
+                              "degeneration -- see the trial log above for which one; not "
+                              "necessarily a word-count problem).")
+                    else:
+                        print(f"\nKeeping the closest non-escalated trial for {rate}% "
+                              "(none hit the target word count within tolerance).")
                 else:
-                    print(f"\nGiving up on {rate}% -- no condensation within tolerance.")
+                    print(f"\nGiving up on {rate}% -- no usable trial produced.")
                 continue
 
             target_words = self._target_words_by_rate[rate]
@@ -581,6 +687,12 @@ class PipelineSession:
                     extra={"rate": rate, "escalated": True, "source": "web", **t},
                 )
 
+            if result["sanity_review_candidates"]:
+                self._sanity_review_pending[rate] = result
+                self._sanity_review_context[rate] = "escalated"
+                needs_sanity_review.append({"rate": rate, "candidates": self._sanity_candidates_payload(result)})
+                continue
+
             if result["text"] is not None:
                 self.condensed_texts[rate] = result["text"]
                 if result.get("sanity_failed"):
@@ -589,6 +701,9 @@ class PipelineSession:
                     print(f"\n{rate}%: no escalated trial hit tolerance -- using the closest one instead of discarding it.")
             else:
                 print(f"\nGiving up on {rate}% after escalation -- no condensation within tolerance.")
+
+        if needs_sanity_review:
+            return {"type": "sanity_review", "payload": {"rates": needs_sanity_review}}
 
         return self._step_injection_analysis()
 
@@ -617,13 +732,30 @@ class PipelineSession:
             }
 
         flags_payload = [
-            {"rate": rate, "flags": result["borderline_flags"]}
+            {"rate": rate, "flags": self._flags_with_source_context(rate)}
             for rate, result in self.injection_results.items() if result["borderline_flags"]
         ]
         if flags_payload:
             return {"type": "injection_review", "payload": {"rates": flags_payload}}
 
         return self._step_build_reports()
+
+    def _flags_with_source_context(self, rate):
+        """Attaches each borderline flag's matched source sentence(s) --
+        resolved from source_refs to actual text -- so the researcher can
+        judge a keep/reassign call without keeping the raw source open in
+        another window."""
+        result = self.injection_results[rate]
+        source_sentences = result["source_sentences"]
+        enriched = []
+        for flag in result["borderline_flags"]:
+            flag = dict(flag)
+            flag["source_texts"] = [
+                source_sentences[idx] for idx in flag.get("source_refs", [])
+                if 0 <= idx < len(source_sentences)
+            ]
+            enriched.append(flag)
+        return enriched
 
     def apply_injection_review(self, reclassifications_by_rate):
         """reclassifications_by_rate: {rate: {span_id: new_type_or_"keep"}}."""
@@ -650,8 +782,8 @@ class PipelineSession:
 
     def _process_and_save_rate(self, rate, condensed_text):
         """Runs cluster coverage -> report building -> saving (injection
-        report, HTML fragment/preview, human report, plain summary, Voyant
-        notebook, standalone report) for one rate, and updates
+        report, HTML fragment/preview, human report, plain summary,
+        standalone report) for one rate, and updates
         self.manifest["rates"][rate] in place. Shared by the initial
         multi-rate build and the post-completion regeneration flow.
         Assumes self.injection_results[rate] is already populated, and
@@ -691,11 +823,6 @@ class PipelineSession:
             output_paths, fragment, preview, human_report, plain_summary, injection_report_data,
         )
 
-        voyant_html = voyant_notebook.build_voyant_notebook(
-            self.enriched_state, {rate: fragment}, self.corpus_name, self.paths,
-        )
-        voyant_notebook.save_voyant_notebook(voyant_html, self.paths.voyant_notebook_path(rate))
-
         standalone_html = standalone_report.build_standalone_report(
             self.enriched_state, fragment, self.corpus_name, rate, self.paths,
         )
@@ -704,7 +831,6 @@ class PipelineSession:
         print(f"\n=== {rate}% condensation outputs written ===")
 
         self.manifest["rates"][rate] = {k: self._rel(v) for k, v in output_paths.items()}
-        self.manifest["rates"][rate]["voyant_notebook"] = self._rel(self.paths.voyant_notebook_path(rate))
         self.manifest["rates"][rate]["standalone_report"] = self._rel(self.paths.standalone_report_path(rate))
 
         return fragment
@@ -717,6 +843,87 @@ class PipelineSession:
         for rate, condensed_text in self.condensed_texts.items():
             self._process_and_save_rate(rate, condensed_text)
 
+        return self._step_prepare_phase3()
+
+    # ------------------------------------------------------------
+    # PHASE 3: distant reading + source-vs-summary comparison
+    # ------------------------------------------------------------
+    # Runs once, automatically, right after Phase 2's initial rates (if
+    # any) are built -- a later post-completion regeneration does not
+    # retroactively update this report, same as run_pipeline.py's own
+    # placement (before its regeneration loop). The only researcher
+    # decision here is which collocation pair(s) to compare, and only
+    # when there's at least one condensation rate to compare against.
+
+    def _step_prepare_phase3(self):
+        print("\n=== Phase 3: distant reading ===")
+        self.decisions3 = DecisionLog(self.corpus_name, phase="phase3")
+        self.phase3_context = phase3_pipeline.prepare_phase3_context(
+            self.phase1_state, self.text, self.nlp, self.stemmer,
+        )
+        print(
+            f"{len(self.phase3_context['stopwords'])} stopword(s) in effect "
+            f"({len(self.phase3_context['auto_authors'])} author name(s) auto-detected)."
+        )
+
+        if self.condensed_texts and self.phase3_context["colloc_candidates"]:
+            self.phase3_skip_note = None
+            return {
+                "type": "collocation_review",
+                "payload": {
+                    "candidates": [
+                        {
+                            "term_a": c["term_a"], "cluster_a": c["cluster_a"],
+                            "term_b": c["term_b"], "cluster_b": c["cluster_b"],
+                            "hits": c["hits"], "confounded": c["confounded"],
+                            "confound_reason": c["confound_reason"],
+                        }
+                        for c in self.phase3_context["colloc_candidates"]
+                    ]
+                },
+            }
+
+        # No decision to make here -- either surface exactly why (no
+        # clusters vs. no real collocations among them), or there's
+        # nothing to compare against at all (no condensation), in which
+        # case skip_reason is None and there's nothing worth disclosing.
+        self.phase3_skip_note = phase3_pipeline.describe_collocation_skip_reason(
+            self.phase3_context["clusterdefs"], self.phase3_context["colloc_candidates"], self.condensed_texts,
+        )
+        if self.phase3_skip_note:
+            print(f"Contexts/Collocates comparison skipped: {self.phase3_skip_note}.")
+        return self._step_build_phase3_report([])
+
+    def apply_collocation_review(self, selected_indices):
+        """selected_indices: list of 0-based ints into
+        self.phase3_context['colloc_candidates'] -- the researcher's
+        chosen pair(s), resolved the same way as the CLI's
+        run_collocation_review but without input()."""
+        candidates = self.phase3_context["colloc_candidates"]
+        selected_pairs = phase3_collocations.select_pairs_by_index(candidates, selected_indices)
+
+        self.decisions3.record(
+            step="collocation_review", decision_type="pair_selection",
+            prompt="Which collocation pair(s) to compare between source and summaries?",
+            options=[f"{c['term_a']} <-> {c['term_b']}" for c in candidates],
+            choice=str(selected_indices),
+            extra={"source": "web", "selected": [f"{c['term_a']} <-> {c['term_b']}" for c in selected_pairs]},
+        )
+
+        self._run_bg(lambda: self._step_build_phase3_report(selected_pairs), "Building Phase 3 distant-reading report")
+
+    def _step_build_phase3_report(self, selected_pairs):
+        html = phase3_pipeline.build_phase3_report(
+            self.phase3_context, self.corpus_name, self.phase1_state, self.text, self.stemmer,
+            self.condensed_texts, selected_pairs, self.nlp,
+        )
+        report_path = self.paths.distant_reading_report_path()
+        phase3_report.save_distant_reading_report(html, report_path)
+        print(f"Distant reading report written to {report_path}")
+
+        self.manifest["distant_reading_report"] = self._rel(report_path)
+        if getattr(self, "phase3_skip_note", None):
+            self.manifest["distant_reading_note"] = self.phase3_skip_note
         print("\nPipeline complete.")
         return None
 
@@ -779,8 +986,14 @@ class PipelineSession:
                 extra={"rate": rate, "source": "web", **t},
             )
 
+        if result["sanity_review_candidates"]:
+            self._sanity_review_pending[rate] = result
+            self._sanity_review_context[rate] = "regen"
+            return {"type": "sanity_review",
+                    "payload": {"rates": [{"rate": rate, "candidates": self._sanity_candidates_payload(result)}]}}
+
         if result["text"] is None:
-            print(f"\nRegeneration at {rate}% failed -- no output produced. "
+            print(f"\nRegeneration at {rate}% failed -- no condensation accepted. "
                   "Previous outputs for this rate, if any, are unchanged.")
             self._regen_rate = None
             return None
@@ -790,7 +1003,13 @@ class PipelineSession:
             note = "using the closest trial instead of discarding it" if result["soft_accept"] else "no valid trial"
             print(f"\n{rate}%: no trial hit the target word count within tolerance -- {note}.")
 
-        condensed_text = result["text"]
+        return self._step_regenerate_after_text(rate, result["text"])
+
+    def _step_regenerate_after_text(self, rate, condensed_text):
+        """Injection analysis for a regenerated condensation, shared by
+        the immediately-accepted path and the sanity-review-accepted
+        path (_step_apply_sanity_review) -- both end up here once a rate
+        has a final, accepted text."""
         self.condensed_texts[rate] = condensed_text
 
         condensed_path = self.paths.condensation_paths(rate)["condensed_text"]
@@ -810,7 +1029,7 @@ class PipelineSession:
         }
 
         if borderline_flags:
-            return {"type": "injection_review", "payload": {"rates": [{"rate": rate, "flags": borderline_flags}]}}
+            return {"type": "injection_review", "payload": {"rates": [{"rate": rate, "flags": self._flags_with_source_context(rate)}]}}
 
         return self._step_finish_regeneration()
 

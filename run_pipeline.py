@@ -1,14 +1,15 @@
 #!/usr/bin/env python
-"""Runs Phase 0 (optional) -> Phase 1 -> Phase 2 -> Voyant export on one
-new corpus in a single script.
+"""Runs Phase 0 (optional) -> Phase 1 -> Phase 2 -> Phase 3 (distant
+reading + source-vs-summary comparison) -> standalone report export on
+one new corpus in a single script.
 
 Same interactive prompts, same outputs under data/<CORPUS_NAME>/, same
 decision logs as running phase0.ipynb (optional) + phase1.ipynb +
 phase2.ipynb by hand -- this script calls the exact same
 phase1/pipeline.py, phase2/pipeline.py, phase2/condense.py,
-phase2/condensation_report.py, common/voyant_notebook.py,
-common/standalone_report.py functions the notebooks call. Nothing here is
-duplicated logic. See RUN_PIPELINE_GUIDE.md for a detailed usage guide.
+phase2/condensation_report.py, phase3/pipeline.py,
+common/standalone_report.py functions the notebooks call. Nothing here
+is duplicated logic. See RUN_PIPELINE_GUIDE.md for a detailed usage guide.
 
 Usage:
     python run_pipeline.py --corpus Boisseau --input raw.txt
@@ -25,12 +26,13 @@ import spacy
 import torch
 from nltk.stem import PorterStemmer
 
-from common.paths import CorpusPaths, resources_dir
+from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import voyant_notebook, standalone_report
+from common import standalone_report
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
+from phase3 import pipeline as phase3_pipeline, collocations as phase3_collocations, report as phase3_report
 
 
 def parse_args():
@@ -182,13 +184,38 @@ def run_phase1(args, paths, decisions):
     )
     phase1_pipeline.print_raw_clusters(clusters, "UPDATED CLUSTERS")
     phase1_pipeline.print_raw_clusters(large_subclusters, "LARGE CLUSTER SUBCLUSTERS")
+    still_oversized = phase1_pipeline.find_oversized_clusters(clusters, args.max_cluster_size)
+    if still_oversized:
+        print(f"\nWARNING: {len(still_oversized)} cluster(s) are still over max_cluster_size "
+              f"({args.max_cluster_size}) after splitting -- sizes: "
+              f"{[len(set(v)) for v in still_oversized.values()]}. The data didn't separate further; "
+              "review these in the cluster-review step below.")
 
     noise_stems = phase1_pipeline.extract_noise_stems(stem_names, labels)
     noise_clusters = phase1_pipeline.recluster_noise(
         noise_stems, stem_occurrences, embedder, tokenizer, model, device,
         min_clusters=args.min_clusters, min_cluster_len=args.min_cluster_len, max_synsets=args.max_synsets,
     )
+    # recluster_noise's own HDBSCAN pass can just as easily produce an
+    # oversized cluster as the primary pass does (its default
+    # cluster-selection method favors one large stable cluster over many
+    # small ones) -- run it through the same max_cluster_size split the
+    # primary pass's output already gets, rather than letting it skip
+    # that safety net purely because of which pass produced it.
+    noise_clusters, noise_large_subclusters = phase1_pipeline.recluster_large_clusters(
+        noise_clusters, stem_occurrences, embedder, tokenizer, model, device,
+        max_cluster_size=args.max_cluster_size, min_clusters=args.min_clusters,
+        min_cluster_len=args.min_cluster_len, max_synsets=args.max_synsets,
+    )
     phase1_pipeline.print_raw_clusters(noise_clusters, "NOISE CLUSTERS")
+    if noise_large_subclusters:
+        phase1_pipeline.print_raw_clusters(noise_large_subclusters, "OVERSIZED NOISE-CLUSTER SUBCLUSTERS")
+    still_oversized = phase1_pipeline.find_oversized_clusters(noise_clusters, args.max_cluster_size)
+    if still_oversized:
+        print(f"\nWARNING: {len(still_oversized)} noise-recovered cluster(s) are still over "
+              f"max_cluster_size ({args.max_cluster_size}) after splitting -- sizes: "
+              f"{[len(set(v)) for v in still_oversized.values()]}. The data didn't separate further; "
+              "review these in the cluster-review step below.")
 
     stem_word_frequencies = phase1_pipeline.build_stem_word_frequency_table(stem_occurrences)
     renamed_clusters = phase1_pipeline.rename_clusters(clusters, stem_word_frequencies)
@@ -205,23 +232,9 @@ def run_phase1(args, paths, decisions):
     )
     renamed_clusters = phase1_pipeline.attach_ngrams(renamed_clusters, cluster_ngrams)
 
-    final_clusters, excluded_cluster_stems, excluded_cluster_ngrams, all_original_stems = (
-        phase1_pipeline.run_cluster_review(renamed_clusters, decisions)
-    )
+    final_clusters, excluded_cluster_ngrams = phase1_pipeline.run_cluster_review(renamed_clusters, decisions)
 
-    corpus_id, smart_stopwords, use_smart_stopwords = phase1_pipeline.run_voyant_settings(
-        decisions, resources_dir() / "stop.en.smart.txt"
-    )
-
-    phase1_state = phase1_pipeline.build_phase1_state(
-        corpus_id=corpus_id,
-        all_original_stems=all_original_stems,
-        excluded_cluster_stems=excluded_cluster_stems,
-        excluded_cluster_ngrams=excluded_cluster_ngrams,
-        final_clusters=final_clusters,
-        smart_stopwords=smart_stopwords,
-        use_smart_stopwords=use_smart_stopwords,
-    )
+    phase1_state = phase1_pipeline.build_phase1_state(final_clusters, excluded_cluster_ngrams)
     phase1_pipeline.save_phase1_state(phase1_state, paths.phase1_state_json())
     print(f"\nSaved JSON to {paths.phase1_state_json()}")
 
@@ -236,8 +249,8 @@ def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_s
                            text, enriched_state, title=None, authors=None, date=None):
     """Runs injection analysis -> borderline review -> cluster coverage ->
     report building -> saving (condensed text, injection report, HTML
-    fragment/preview, human report, plain summary, Voyant notebook,
-    standalone report), for one already-generated rate. Shared by the
+    fragment/preview, human report, plain summary, standalone report),
+    for one already-generated rate. Shared by the
     initial per-rate loop in run_phase2 and the post-condensation
     regeneration loop, so a regenerated rate goes through the exact same
     pipeline as a freshly generated one. Returns the HTML fragment."""
@@ -255,7 +268,7 @@ def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_s
     print(f"Non-injected word share: {stats['non_injected_pct']}%")
     print(f"Verbatim-overlap scan: {stats['verbatim_overlap_pct']}%")
 
-    condense.run_injection_review(all_spans, borderline_flags, rate, decisions)
+    condense.run_injection_review(all_spans, borderline_flags, rate, decisions, source_sentences=source_sentences)
 
     coverage = condense.compute_cluster_coverage(phase1_state, condensed_text, text, stemmer)
     print(f"\n=== Cluster coverage: {rate}% condensation ===")
@@ -294,13 +307,6 @@ def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_s
     for label, p in output_paths.items():
         if label != "condensed_text":
             print(f"  {label}: {p}")
-
-    voyant_html = voyant_notebook.build_voyant_notebook(
-        enriched_state, {rate: fragment}, args.corpus, paths,
-    )
-    voyant_path = paths.voyant_notebook_path(rate)
-    voyant_notebook.save_voyant_notebook(voyant_html, voyant_path)
-    print(f"Voyant notebook written to {voyant_path}")
 
     report_html = standalone_report.build_standalone_report(
         enriched_state, fragment, args.corpus, rate, paths,
@@ -421,10 +427,15 @@ def run_regeneration_loop(condensed_texts, args, paths, decisions, phase1_state,
                 prompt="Condensation regeneration trial", extra={"rate": rate, **t},
             )
 
+        if result["sanity_review_candidates"]:
+            result = condense.run_sanity_review_for_rate(rate, result, decisions)
+
         if result["text"] is None:
-            print(f"\nRegeneration at {rate}% failed -- no output produced. Previous outputs for this rate, if any, are unchanged.")
+            print(f"\nRegeneration at {rate}% failed -- no condensation accepted. Previous outputs for this rate, if any, are unchanged.")
             continue
-        if result.get("sanity_failed"):
+        if result.get("researcher_accepted_despite_sanity"):
+            pass  # already reported by run_sanity_review_for_rate above
+        elif result.get("sanity_failed"):
             print(f"\n{rate}%: no trial passed the sanity checks -- using the closest trial by word count anyway, flag it for a manual look.")
         elif not result["success"]:
             note = "using the closest trial instead of discarding it" if result["soft_accept"] else "no valid trial"
@@ -438,6 +449,45 @@ def run_regeneration_loop(condensed_texts, args, paths, decisions, phase1_state,
         print(f"\nRegenerated {rate}% condensation.")
 
 
+def run_phase3(args, paths, phase1_state, nlp, stemmer, text, condensed_texts):
+    """Runs Phase 3 (single-corpus distant reading, plus a source-vs-summary
+    comparison for every rate already generated by the time this runs --
+    a later post-completion regeneration does not retroactively update
+    this report). Own decision log, own output file. Mirrors
+    phase3/pipeline.py's pure orchestration; the collocation-pair
+    selection is the one interactive step, handled here via
+    collocations.run_collocation_review rather than inside phase3/pipeline.py
+    itself -- same "interactive wrapper vs. pure function" split as
+    run_phase1's use of phase1_pipeline.run_cluster_review."""
+    decisions3 = DecisionLog(args.corpus, phase="phase3")
+
+    print("\n===================================")
+    print("PHASE 3: DISTANT READING")
+    print("===================================\n")
+
+    context = phase3_pipeline.prepare_phase3_context(phase1_state, text, nlp, stemmer)
+    print(
+        f"{len(context['stopwords'])} stopword(s) in effect "
+        f"({len(context['auto_authors'])} author name(s) auto-detected)."
+    )
+
+    selected_pairs = []
+    if condensed_texts and context["colloc_candidates"]:
+        selected_pairs = phase3_collocations.run_collocation_review(context["colloc_candidates"], decisions3)
+    else:
+        skip_reason = phase3_pipeline.describe_collocation_skip_reason(
+            context["clusterdefs"], context["colloc_candidates"], condensed_texts,
+        )
+        if skip_reason:
+            print(f"\nContexts/Collocates comparison skipped: {skip_reason}.")
+
+    html = phase3_pipeline.build_phase3_report(
+        context, args.corpus, phase1_state, text, stemmer, condensed_texts, selected_pairs, nlp,
+    )
+    phase3_report.save_distant_reading_report(html, paths.distant_reading_report_path())
+    print(f"\nDistant reading report written to {paths.distant_reading_report_path()}")
+
+
 def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text):
     """Mirrors phase2.ipynb cell-by-cell."""
     enriched_state = phase2_pipeline.enrich_with_informative_sentences(
@@ -448,7 +498,16 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text):
     print(f"\nSaved enriched JSON to\n{paths.phase2_output_json()}")
 
     rates, ollama_model, max_trials = resolve_condensation_config(args, decisions)
-    title, authors, date = condense.run_source_metadata_setup(decisions, text, ollama_model)
+
+    # Metadata detection reads the untouched original input, not `text`
+    # (which may already be Phase-0-cleaned) -- title/author/date front
+    # matter is reliably positioned at the very start of the document,
+    # and Phase 0 cleaning isn't guaranteed to leave it alone (e.g. a
+    # title that also repeats as a running header gets stripped as a
+    # recurring short line).
+    with open(args.input, encoding="utf-8") as f:
+        original_text = f.read()
+    title, authors, date = condense.run_source_metadata_setup(decisions, original_text, ollama_model)
 
     ordered_sentences = condense.gather_ordered_informative_sentences(enriched_state)
     cluster_key_terms = condense.gather_cluster_key_terms(enriched_state)
@@ -469,6 +528,8 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text):
             rate, condensed_text, args, paths, decisions, phase1_state, nlp, stemmer, text, enriched_state,
             title=title, authors=authors, date=date,
         )
+
+    run_phase3(args, paths, phase1_state, nlp, stemmer, text, condensed_texts)
 
     run_regeneration_loop(
         condensed_texts, args, paths, decisions, phase1_state, nlp, stemmer, text,

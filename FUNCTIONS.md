@@ -18,7 +18,7 @@ Single source of truth for every phase's file paths, keyed by `CORPUS_NAME`.
 
 | Function | Purpose | Called from |
 |---|---|---|
-| `CorpusPaths(corpus_name)` | Constructor; computes `raw_dir`, `phase1_dir`, `phase2_dir`, `decisions_dir` under `data/<corpus_name>/` | Every notebook's config cell, `run_pipeline.py` |
+| `CorpusPaths(corpus_name)` | Constructor; computes `raw_dir`, `phase1_dir`, `phase2_dir`, `phase3_dir`, `decisions_dir` under `data/<corpus_name>/` | Every notebook's config cell, `run_pipeline.py` |
 | `.ensure_dirs()` | Creates all of the above (+ `condensation_dir()`) if missing | Config cells, `run_pipeline.py::main` |
 | `.raw_txt()` | `data/<corpus>/raw/<corpus>.txt` | phase1/phase2 notebooks, `run_pipeline.py` |
 | `.top_stems()` | Phase 1's top-stems TSV path | `phase1/pipeline.py::extract_top_stems` callers |
@@ -29,8 +29,8 @@ Single source of truth for every phase's file paths, keyed by `CORPUS_NAME`.
 | `.decisions_log(phase)` | `data/<corpus>/decisions/<phase>_decisions.jsonl` path | `common/decisions.py::DecisionLog.__init__` |
 | `.condensation_dir()` | `data/<corpus>/phase2/condensation/` | `.ensure_dirs()`, `.condensation_paths()` |
 | `.condensation_paths(rate)` | dict of all 6 per-rate output file paths (condensed text, injection report, HTML fragment/preview, human report, plain summary) | Phase 2's generate/export cells |
-| `.voyant_notebook_path(rate)` | Per-rate filled Voyant notebook HTML path | Phase 2's "BUILD VOYANT NOTEBOOK" cell |
-| `resources_dir()` (module function) | `resources/` folder path (shared, cross-corpus assets) | Phase 1's Voyant-settings step, `common/voyant_notebook.py` |
+| `.standalone_report_path(rate)` | Per-rate standalone report HTML path | Phase 2's "BUILD STANDALONE REPORT" cell |
+| `.distant_reading_report_path()` | Phase 3's single output HTML path | `phase3/report.py::save_distant_reading_report` callers |
 
 ## `common/decisions.py`
 
@@ -49,19 +49,18 @@ Minimal wrapper for a locally running [Ollama](https://ollama.com) instance.
 | `list_models(host=, timeout=)` | Installed model names | `condense.py::run_condensation_setup` |
 | `generate(model, prompt, host=, timeout=)` | Blocking, non-streaming `/api/generate` call; raises `OllamaError` on failure | `condense.py::attempt_condensation_trials` |
 
-## `common/voyant_notebook.py`
+## `common/standalone_report.py`
 
-Fills `resources/PEEL-TemplateSN.html`'s derivable placeholders with a
-corpus's Phase 1 + Phase 2 results (see README's "Phase 2 condensation &
-injection review" section for which placeholders and why).
+Builds a self-contained HTML report of a corpus's Phase 1 + Phase 2
+results -- condensation, cluster results, and a run summary -- as its
+own cleanly styled page.
 
 | Function | Purpose | Called from |
 |---|---|---|
-| `_to_js_array(items)` | Python list -> JS array literal string | `build_voyant_notebook` |
-| `build_cluster_results_html(phase1_state)` | Renders Phase 1 clusters as an HTML list, for the template's cluster-results cell | `build_voyant_notebook` |
-| `build_optional_material_html(phase1_state, corpus_name, rates, paths)` | Short summary (rates generated, decision-log paths) for the template's "optional material" cell | `build_voyant_notebook` |
-| `build_voyant_notebook(phase1_state, condensation_fragment_by_rate, corpus_name, paths)` | Reads the shared template, does the placeholder substitutions, returns the filled HTML (template file itself untouched) | Phase 2's final notebook cell, `run_pipeline.py::run_phase2` |
-| `save_voyant_notebook(html, path)` | Writes the filled HTML to disk | Same callers as above |
+| `build_cluster_results_html(phase1_state)` | Renders Phase 1 clusters as an HTML list | `build_standalone_report` |
+| `build_optional_material_html(phase1_state, corpus_name, rates, paths)` | Short summary (rates generated, decision-log paths) | `build_standalone_report` |
+| `build_standalone_report(phase1_state, fragment, corpus_name, rate, paths)` | Combines the condensation fragment, cluster results, and run summary into one complete HTML page | Phase 2's final notebook cell, `run_pipeline.py::process_and_save_rate`, `webapp/pipeline_session.py::_process_and_save_rate` |
+| `save_standalone_report(html, path)` | Writes the report HTML to disk | Same callers as above |
 
 ---
 
@@ -119,10 +118,8 @@ Stem extraction, GlossBERT WSD, and Sentence-BERT/HDBSCAN clustering.
 | `attach_ngrams(renamed_clusters, cluster_ngrams)` | Merges n-grams into each cluster's dict | Same |
 | `print_cluster_for_review(cluster_name, cluster_data)` | Console printer for one cluster | `run_cluster_review` |
 | `parse_index_selection(raw_input, items)` | Parses `"2,5,1"` into (kept, removed); raises `ValueError` on bad input | `run_cluster_review` |
-| **`run_cluster_review(renamed_clusters, decisions)`** (interactive) | Per-cluster accept/rename/remove-stems/remove-ngrams/global-exclude flow | phase1.ipynb, `run_pipeline.py::run_phase1` |
-| `read_smart_stopwords(path)` | Reads Voyant's `en_smart` stopword list | `run_voyant_settings` |
-| **`run_voyant_settings(decisions, stopwords_path)`** (interactive) | Corpus-ID + smart-stopwords prompts | phase1.ipynb, `run_pipeline.py::run_phase1` |
-| `build_phase1_state(corpus_id, all_original_stems, ...)` | Assembles the final `phase1_state` dict (`incList`/`excList`/`clusterDefs`/...) | Phase 1's save cell, `run_pipeline.py` |
+| **`run_cluster_review(renamed_clusters, decisions)`** (interactive) | Per-cluster accept/rename/remove-stems/remove-ngrams flow | phase1.ipynb, `run_pipeline.py::run_phase1` |
+| `build_phase1_state(final_clusters, excluded_cluster_ngrams)` | Assembles the final `phase1_state` dict (`excludedNgrams`/`clusterDefs`) | Phase 1's save cell, `run_pipeline.py` |
 | `save_phase1_state(state, path)` | Writes `phase1_state.json` | Same |
 | `hex_to_rgb(h)` / `build_cluster_html(final_clusters, corpus_name, ...)` / `save_html(html, path)` | Tableau20-colored HTML cluster summary | Phase 1's HTML export cell, `run_pipeline.py` |
 
@@ -186,8 +183,8 @@ are **interactive**. See README's condensation section for the taxonomy.
 
 ## `phase2/condensation_report.py`
 
-Renders `condense.py`'s results into the Spyral-paste-ready HTML fragment
-and the plainer report formats.
+Renders `condense.py`'s results into an HTML fragment and the plainer
+report formats.
 
 | Function | Purpose | Called from |
 |---|---|---|
@@ -198,7 +195,7 @@ and the plainer report formats.
 | `_render_blocks_with_toggles(body_blocks, all_spans, source_sentences)` | Renders every body block with inline toggles after C/R spans | `build_condensation_fragment` |
 | `build_meta_legend(...)` | Metadata table + F/T/R/C color legend | `build_condensation_fragment` |
 | `build_coverage_table(coverage_report)` | Cluster-coverage HTML table | `build_condensation_fragment` |
-| `build_condensation_fragment(condensed_text, all_spans, source_sentences, coverage_report, ..., title=, authors=, date=)` | Assembles the full inline-style HTML fragment: metadata table + F/T/R/C legend first, then the title/byline header (from the explicit `title`/`authors`/`date` args, optional -- falls back to `corpus_name` with no byline), then the body and coverage table | Phase 2's export cell, `run_pipeline.py`, `voyant_notebook.build_voyant_notebook` |
+| `build_condensation_fragment(condensed_text, all_spans, source_sentences, coverage_report, ..., title=, authors=, date=)` | Assembles the full inline-style HTML fragment: metadata table + F/T/R/C legend first, then the title/byline header (from the explicit `title`/`authors`/`date` args, optional -- falls back to `corpus_name` with no byline), then the body and coverage table | Phase 2's export cell, `run_pipeline.py` (result later embedded as-is by `standalone_report.build_standalone_report`) |
 | `build_standalone_preview(fragment_html, corpus_name)` | Wraps the fragment in a minimal browsable `<html>` | Same callers |
 | `build_human_report(all_spans, borderline_flags, coverage_report, ..., sanity_issues=)` | Plain-text verification report, including a "Generation sanity checks" section | Same |
 | `build_plain_summary(blocks)` | Markup-free title/body text | Same |
@@ -206,10 +203,104 @@ and the plainer report formats.
 
 ---
 
+## `phase3/terms.py`
+
+Shared term-matching utilities: finding a cluster stem/n-gram's token
+positions in a document (stems by exact PorterStemmer match, n-grams by
+exact lemma match over a contiguous span -- mirroring how
+`phase1/pipeline.py` itself builds each), and a proximity check between
+two position lists.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `token_forms(doc, stemmer)` | Returns `(stems, lemmas)`, one stemmed and one lemmatized string per alpha token | Every other function in this file, `collocations.py`, `distant_reading.py` |
+| `term_positions(stems, lemmas, term)` | Token indices where a stem/n-gram occurs | Same callers |
+| `count_positions_near(pos_a, pos_b, proximity_n)` | How many `pos_a` entries have a `pos_b` entry within `proximity_n` tokens -- two-pointer sweep | `collocations.py::find_source_collocations` |
+| `positions_near(pos_a, target_positions, proximity_n)` | Filters `pos_a` down to entries near any `target_positions` entry | `distant_reading.py::build_contexts_table` |
+
+## `phase3/stopwords.py`
+
+Comprehensive stopword construction for Phase 3's frequency-based tools.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `numeral_stopwords(text)` | Numeral tokens (incl. `2024a`-style) | `build_stopwords` |
+| `candidate_author_surnames(doc)` | PERSON-entity names, ranked by mention count | `build_stopwords`, report provenance |
+| `build_stopwords(nlp_stopwords, doc, min_author_mentions=)` | spaCy's stopword list + numerals + citation abbreviations + auto-included author names (3+ mentions, disclosed, never researcher-confirmed) | `phase3/pipeline.py::prepare_phase3_context` |
+
+## `phase3/collocations.py`
+
+Empirical collocation-pair discovery: scans the source for term pairs
+(from different clusters) that actually co-occur, ranks by hit count,
+flags base-rate confounds.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `find_source_collocations(doc, clusterdefs, stemmer, ...)` | Ranked, confound-flagged candidate list | `phase3/pipeline.py::prepare_phase3_context` |
+| `format_collocation_candidates(candidates)` | Console-printable candidate list | `run_collocation_review` |
+| `select_pairs_by_index(candidates, indices)` | Resolves 0-based indices to candidates, falling back to the top-ranked one | `run_collocation_review`, `webapp/pipeline_session.py::apply_collocation_review` |
+| **`run_collocation_review(candidates, decisions)`** (interactive) | Prints candidates, prompts for a selection | `run_pipeline.py::run_phase3` |
+
+## `phase3/distant_reading.py`
+
+Single-corpus analyses, reused once per document by `comparison.py` --
+Python-native reimplementations of a retired set of Voyant tool cells
+(Reader, Cirrus, Trends, Phrases, CorpusTerms, Contexts; CollocatesGraph
+is replaced by a co-occurrence table, Bubblelines is not reproduced
+separately from Trends).
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `build_reader_html(doc, clusterdefs, colors_by_cluster, stemmer, ...)` | Full text with cluster terms highlighted, token-level matching | `phase3/pipeline.py::build_phase3_report` |
+| `build_wordcloud_html(text, stopwords, ...)` | Word cloud PNG (via `wordcloud`), embedded as a base64 `<img>` | `build_phase3_report`, `comparison.py` |
+| `bin_cluster_frequencies(text, clusterdefs, stemmer, n_bins=)` | Per-cluster hit counts across `n_bins` segments (reuses `condense.py::_cluster_hit_counts`) | `build_phase3_report` |
+| `build_trend_chart_svg(bin_freqs, colors_by_cluster, ...)` | Hand-rolled inline SVG line chart, no dependency | `build_phase3_report` |
+| `build_phrase_table(doc, stopwords, min_n=, max_n=, top_n=)` | N-gram frequency table, overlap-filtered | `build_phase3_report` |
+| `build_term_stats_table(doc, clusterdefs, stemmer, n_bins=, top_n=)` | Raw/relative frequency + peakedness (`scipy.stats.kurtosis`) + skewness (`scipy.stats.skew`) per term, with a sparkline | `build_phase3_report` |
+| `build_contexts_table(doc, stemmer, term_a, term_b=, ...)` | KWIC concordance, optionally restricted to occurrences near `term_b` | `build_phase3_report`, `comparison.py` |
+| `build_collocates_table(doc, stemmer, anchor_term, ...)` | Co-occurrence table for one anchor term | `comparison.py` |
+
+## `phase3/comparison.py`
+
+Source-vs-Summary comparison, built once per approved condensation rate.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `build_document_profile_table(documents)` | Word count/unique words/lexical density per document | `build_comparison_section` |
+| `build_comparison_section(source_doc, rate_docs, phase1_state, source_text, stemmer, stopwords, selected_pairs)` | Assembles the whole "Source vs. Summary" section -- document profile, cluster coverage (reuses `condense.compute_cluster_coverage`/`condensation_report.build_coverage_table`), word clouds, Contexts, Collocates | `phase3/pipeline.py::build_phase3_report` |
+
+## `phase3/report.py`
+
+Assembles the standalone HTML report, same inline-style convention as
+`common/standalone_report.py`.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `build_cluster_legend_html(clusterdefs, colors_by_cluster)` | Colour-coded cluster legend table | `build_distant_reading_report` |
+| `build_cross_cluster_html(clusterdefs)` | Stems appearing in more than one cluster | `build_distant_reading_report` |
+| `build_provenance_html(stopword_count, auto_authors, collocation_candidates, selected_pairs)` | Discloses stopword/author/collocation-selection provenance | `phase3/pipeline.py::build_phase3_report` |
+| `build_distant_reading_report(...)` | Assembles the full standalone HTML page | `phase3/pipeline.py::build_phase3_report` |
+| `save_distant_reading_report(html, path)` | Writes the report to disk | `run_pipeline.py`, `webapp/pipeline_session.py` |
+
+## `phase3/pipeline.py`
+
+Top-level, non-interactive Phase 3 orchestration -- mirrors
+`phase1/pipeline.py`'s split between pure functions and CLI-only
+`run_*` wrappers.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `assign_cluster_colors(clusterdefs, tableau20=)` | Tableau20 colours, sequential by cluster order | `prepare_phase3_context` |
+| `prepare_phase3_context(phase1_state, source_text, nlp, stemmer)` | Parses the source, builds stopwords, scans for collocations -- everything needed before the one researcher decision | `run_pipeline.py::run_phase3`, `webapp/pipeline_session.py::_step_prepare_phase3` |
+| `build_phase3_report(context, corpus_name, phase1_state, source_text, stemmer, condensed_texts, selected_pairs, nlp, n_bins=)` | Builds every section and returns the report HTML; `condensed_texts={}` skips just the Source-vs-Summary section | Same callers |
+
+---
+
 ## `run_pipeline.py` (repo root)
 
-Runs Phase 0 (optional) -> Phase 1 -> Phase 2 -> Voyant export on one new
-corpus in a single script -- see README's "Running the pipeline" for usage.
+Runs Phase 0 (optional) -> Phase 1 -> Phase 2 -> Phase 3 -> standalone
+report export on one new corpus in a single script -- see README's
+"Running the pipeline" for usage.
 
 | Function | Purpose |
 |---|---|
@@ -217,5 +308,6 @@ corpus in a single script -- see README's "Running the pipeline" for usage.
 | `place_raw_text(args, paths)` | Copies `--input` to `paths.raw_txt()`, or runs `clean_corpus.clean_text` first if `--clean` |
 | `resolve_condensation_config(args, decisions)` | Uses CLI condensation flags if all three given (logged with `"source": "cli"`); else falls back to `condense.run_condensation_setup` |
 | `run_phase1(args, paths, decisions)` | Mirrors `phase1.ipynb` cell-by-cell; returns `(phase1_state, nlp, stemmer, text)` |
-| `run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text)` | Mirrors `phase2.ipynb` cell-by-cell, plus `condense.run_source_metadata_setup` and the post-completion regeneration loop (`run_regeneration_loop`), neither of which the notebook has |
+| `run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text)` | Mirrors `phase2.ipynb` cell-by-cell, plus `condense.run_source_metadata_setup`, `run_phase3` (right after the initial rates' reports are built), and the post-completion regeneration loop (`run_regeneration_loop`) -- none of which the notebook has |
+| `run_phase3(args, paths, phase1_state, nlp, stemmer, text, condensed_texts)` | No notebook equivalent. Builds the Phase 3 context, runs `collocations.run_collocation_review` if there's a condensation to compare against, and writes the distant-reading report -- own `DecisionLog(phase="phase3")` |
 | `main()` | Wires `CorpusPaths`, `place_raw_text`, `run_phase1` (its own `DecisionLog(phase="phase1")`), `run_phase2` (its own `DecisionLog(phase="phase2")`) |

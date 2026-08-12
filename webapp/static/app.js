@@ -95,10 +95,11 @@ function renderDecision(decision) {
   switch (decision.type) {
     case "flagged_term_review": return renderFlaggedTermReview(decision.payload);
     case "cluster_review": return renderClusterReview(decision.payload);
-    case "voyant_settings": return renderVoyantSettings(decision.payload);
     case "phase2_setup": return renderPhase2Setup(decision.payload);
+    case "sanity_review": return renderSanityReview(decision.payload);
     case "escalation": return renderEscalation(decision.payload);
     case "injection_review": return renderInjectionReview(decision.payload);
+    case "collocation_review": return renderCollocationReview(decision.payload);
     default:
       console.warn("Unknown decision type", decision);
   }
@@ -220,9 +221,6 @@ function renderClusterReview(payload) {
     const stemChips = cluster.stems.map((s) => `
       <label class="chip">
         <input type="checkbox" class="stem-keep" value="${escapeHtml(s)}" checked> ${escapeHtml(s)}
-        <span class="exclude-wrap hidden">
-          &middot; <label><input type="checkbox" class="stem-exclude" value="${escapeHtml(s)}"> also exclude globally</label>
-        </span>
       </label>`).join("");
 
     const ngramChips = cluster.ngrams.map((g) => `
@@ -250,11 +248,7 @@ function renderClusterReview(payload) {
 
   function setStemKept(checkbox, keep) {
     checkbox.checked = keep;
-    const chip = checkbox.closest(".chip");
-    const wrap = chip.querySelector(".exclude-wrap");
-    wrap.classList.toggle("hidden", keep);
-    chip.classList.toggle("removed", !keep);
-    if (keep) wrap.querySelector(".stem-exclude").checked = false;
+    checkbox.closest(".chip").classList.toggle("removed", !keep);
   }
 
   function setNgramKept(checkbox, keep) {
@@ -262,7 +256,6 @@ function renderClusterReview(payload) {
     checkbox.closest(".chip").classList.toggle("removed", !keep);
   }
 
-  // Toggle the "also exclude globally" sub-checkbox's visibility based on keep state
   container.addEventListener("change", (e) => {
     if (e.target.classList.contains("stem-keep")) setStemKept(e.target, e.target.checked);
     if (e.target.classList.contains("ngram-keep")) setNgramKept(e.target, e.target.checked);
@@ -295,13 +288,10 @@ function renderClusterReview(payload) {
 
 async function submitClusterReview() {
   const clusters = $all("#cluster-review-list .card").map((card) => {
-    const keptStems = [], removedStems = [], globallyExcluded = [];
+    const keptStems = [], removedStems = [];
     $all(".stem-keep", card).forEach((cb) => {
       if (cb.checked) keptStems.push(cb.value);
       else removedStems.push(cb.value);
-    });
-    $all(".stem-exclude", card).forEach((cb) => {
-      if (cb.checked) globallyExcluded.push(cb.value);
     });
 
     const keptNgrams = [], removedNgrams = [];
@@ -316,7 +306,6 @@ async function submitClusterReview() {
       new_name: $(".cluster-name", card).value,
       kept_stems: keptStems, removed_stems: removedStems,
       kept_ngrams: keptNgrams, removed_ngrams: removedNgrams,
-      globally_excluded_stems: globallyExcluded,
     };
   });
 
@@ -333,41 +322,6 @@ async function submitClusterReview() {
 }
 
 $all(".submit-cluster-review").forEach((btn) => btn.addEventListener("click", submitClusterReview));
-
-// ------------------------------------------------------------
-// VOYANT SETTINGS
-// ------------------------------------------------------------
-
-function renderVoyantSettings(payload) {
-  $("#voyant-summary").textContent =
-    `Phase 1 produced ${payload.cluster_count} cluster(s) covering ${payload.stem_count} stem(s).`;
-  showScreen("screen-voyant-settings");
-}
-
-$all("#screen-voyant-settings .yesno-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    $all("#screen-voyant-settings .yesno-btn").forEach((b) => b.classList.remove("selected"));
-    btn.classList.add("selected");
-    $("#use_smart_stopwords").value = btn.dataset.value;
-  });
-});
-
-$("#voyant-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  try {
-    await api("/api/decisions/voyant-settings", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        corpus_id: $("#corpus_id").value,
-        use_smart_stopwords: $("#use_smart_stopwords").value === "true",
-      }),
-    });
-    showScreen("screen-progress");
-    startPolling();
-  } catch (err) {
-    alert(err.message);
-  }
-});
 
 // ------------------------------------------------------------
 // PHASE 2 SETUP
@@ -390,9 +344,33 @@ $all("#screen-phase2-setup .yesno-btn").forEach((btn) => {
   });
 });
 
-$("#auto_detect_metadata").addEventListener("change", (e) => {
-  $("#metadata-fields").classList.toggle("hidden", e.target.checked);
-});
+async function detectMetadata(ollamaModel) {
+  const statusEl = $("#metadata-status");
+  statusEl.classList.remove("error-text");
+  if (!ollamaModel) {
+    statusEl.textContent = "Pick an Ollama model above, then AI detection will run automatically.";
+    return;
+  }
+  statusEl.textContent = "Detecting the source's title/author(s)/date with AI...";
+  try {
+    const data = await api(`/api/detect-metadata?ollama_model=${encodeURIComponent(ollamaModel)}`);
+    $("#source_title").value = data.title === "Unclear" ? "" : data.title;
+    $("#source_authors").value = data.authors === "Unclear" ? "" : data.authors;
+    $("#source_date").value = data.date === "Unclear" ? "" : data.date;
+    statusEl.textContent =
+      "The workflow already used AI to try to identify this information (shown below, or left " +
+      "blank where it wasn't confident). Review it and correct anything that's wrong before continuing.";
+  } catch (err) {
+    // Loud on purpose: a quiet hint here is exactly how this failure mode
+    // goes unnoticed -- fields stay blank, get submitted as "Unclear",
+    // and there's no other visible sign anything went wrong.
+    console.error("detectMetadata failed:", err);
+    statusEl.classList.add("error-text");
+    statusEl.textContent =
+      `Could not auto-detect title/author/date (${err.message}). This is worth checking the server ` +
+      "console for -- enter the fields manually below in the meantime.";
+  }
+}
 
 async function refreshOllamaModels() {
   const statusEl = $("#ollama-status");
@@ -415,12 +393,14 @@ async function refreshOllamaModels() {
       select.appendChild(opt);
     });
     statusEl.textContent = `Ollama is available -- ${data.models.length} model(s) found.`;
+    if (data.models.length > 0) detectMetadata(select.value);
   } catch (err) {
     statusEl.textContent = `Could not check Ollama: ${err.message}`;
   }
 }
 
 $("#refresh-models").addEventListener("click", refreshOllamaModels);
+$("#ollama_model").addEventListener("change", (e) => detectMetadata(e.target.value));
 
 $("#phase2-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -438,7 +418,6 @@ $("#phase2-form").addEventListener("submit", async (e) => {
         title: $("#source_title").value,
         authors: $("#source_authors").value,
         date: $("#source_date").value,
-        auto_detect_metadata: $("#auto_detect_metadata").checked,
       }),
     });
     showScreen("screen-progress");
@@ -447,6 +426,66 @@ $("#phase2-form").addEventListener("submit", async (e) => {
     alert(err.message);
   }
 });
+
+// ------------------------------------------------------------
+// SANITY-CHECK REVIEW
+// ------------------------------------------------------------
+
+function renderSanityReview(payload) {
+  const container = $("#sanity-review-list");
+  container.innerHTML = "";
+
+  payload.rates.forEach((r) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.dataset.rate = r.rate;
+
+    const candidatesHtml = r.candidates.map((c) => {
+      const issuesHtml = (c.sanity_issues || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("");
+      return `
+        <label class="sanity-candidate">
+          <input type="radio" name="sanity-choice-${r.rate}" value="${c.trial}">
+          Trial ${c.trial}: ${c.word_count} words (target ${c.target_words})
+          <ul class="meta">${issuesHtml}</ul>
+        </label>`;
+    }).join("");
+
+    card.innerHTML = `
+      <h3>${r.rate}% condensation</h3>
+      <p class="meta">${r.candidates.length} trial(s) hit the target word count but failed a sanity check:</p>
+      ${candidatesHtml}
+      <label class="sanity-candidate">
+        <input type="radio" name="sanity-choice-${r.rate}" value="" checked>
+        Reject all (fall back to escalation)
+      </label>
+    `;
+    container.appendChild(card);
+  });
+
+  showScreen("screen-sanity-review");
+}
+
+async function submitSanityReview() {
+  const decisions = {};
+  $all("#sanity-review-list .card").forEach((card) => {
+    const rate = card.dataset.rate;
+    const checked = card.querySelector(`input[name="sanity-choice-${rate}"]:checked`);
+    decisions[rate] = checked && checked.value ? parseInt(checked.value, 10) : null;
+  });
+
+  try {
+    await api("/api/decisions/sanity-review", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decisions }),
+    });
+    showScreen("screen-progress");
+    startPolling();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+$all(".submit-sanity-review").forEach((btn) => btn.addEventListener("click", submitSanityReview));
 
 // ------------------------------------------------------------
 // ESCALATION
@@ -461,9 +500,13 @@ function renderEscalation(payload) {
     card.className = "card";
     card.dataset.rate = r.rate;
 
-    const trialsHtml = r.trials.map((t) =>
-      `<li>trial ${t.trial}: ${t.word_count} words (target ${t.target_words})</li>`
-    ).join("");
+    const trialsHtml = r.trials.map((t) => {
+      const status = t.within_tolerance ? "within tolerance" : "outside tolerance";
+      const issues = (t.sanity_issues || []).length
+        ? ` -- failed sanity check: ${t.sanity_issues.map(escapeHtml).join("; ")}`
+        : "";
+      return `<li>trial ${t.trial}: ${t.word_count} words (target ${t.target_words}, ${status})${issues}</li>`;
+    }).join("");
 
     card.innerHTML = `
       <h3>${r.rate}% condensation</h3>
@@ -536,9 +579,18 @@ function renderInjectionReview(payload) {
         return `<button type="button" class="span-type-btn ${selected}" data-value="${t}">${label}</button>`;
       }).join("");
 
+      const sourceLabel = flag.source_is_candidate_only
+        ? "Closest candidate source sentence (not an official match -- this span's classification skipped source attribution):"
+        : "Matched source sentence(s):";
+      const sourceHtml = (flag.source_texts || []).length
+        ? `<p class="meta">${sourceLabel}</p>` +
+          flag.source_texts.map((s) => `<p class="source-context">"${escapeHtml(s)}"</p>`).join("")
+        : `<p class="meta">No matching source sentence found for this span.</p>`;
+
       card.innerHTML = `
         <p class="meta">${escapeHtml(flag.span_id)} (${escapeHtml(flag.type)}): ${escapeHtml(flag.reason)}</p>
-        <p>"${escapeHtml(flag.text)}"</p>
+        <p>Condensed: "${escapeHtml(flag.text)}"</p>
+        ${sourceHtml}
         <div class="span-type-btns">${typeButtons}</div>
         <input type="hidden" class="span-choice" value="keep">
       `;
@@ -580,18 +632,69 @@ async function submitInjectionReview() {
 $all(".submit-injection-review").forEach((btn) => btn.addEventListener("click", submitInjectionReview));
 
 // ------------------------------------------------------------
+// COLLOCATION REVIEW (Phase 3)
+// ------------------------------------------------------------
+
+function renderCollocationReview(payload) {
+  const container = $("#collocation-review-list");
+  container.innerHTML = "";
+
+  const table = document.createElement("table");
+  table.innerHTML = `
+    <thead><tr>
+      <th></th><th>Term A</th><th>Cluster A</th><th>Term B</th><th>Cluster B</th><th>Co-occurrences</th>
+    </tr></thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector("tbody");
+
+  payload.candidates.forEach((c, i) => {
+    const tr = document.createElement("tr");
+    if (c.confounded) tr.classList.add("confounded");
+    tr.innerHTML = `
+      <td><input type="checkbox" class="colloc-pick" value="${i}" ${i === 0 ? "checked" : ""}></td>
+      <td>${escapeHtml(c.term_a)}</td>
+      <td class="meta">${escapeHtml(c.cluster_a)}</td>
+      <td>${escapeHtml(c.term_b)}</td>
+      <td class="meta">${escapeHtml(c.cluster_b)}</td>
+      <td>${c.hits}${c.confounded ? " &middot; possibly confounded" : ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  container.appendChild(table);
+  showScreen("screen-collocation-review");
+}
+
+async function submitCollocationReview() {
+  const selected_indices = $all(".colloc-pick:checked").map((cb) => parseInt(cb.value, 10));
+
+  try {
+    await api("/api/decisions/collocation-review", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selected_indices }),
+    });
+    showScreen("screen-progress");
+    startPolling();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+$all(".submit-collocation-review").forEach((btn) => btn.addEventListener("click", submitCollocationReview));
+
+// ------------------------------------------------------------
 // COMPLETE
 // ------------------------------------------------------------
 
 const FILE_LABELS = {
   condensed_text: "Condensed text",
   injection_report: "Injection report (JSON)",
-  html_fragment: "HTML fragment (Spyral-paste-ready)",
+  html_fragment: "HTML fragment",
   html_preview: "Standalone preview",
   human_report: "Human-readable report",
   plain_summary: "Plain-text summary",
-  voyant_notebook: "Filled Voyant notebook",
-  standalone_report: "Standalone report (non-Voyant)",
+  standalone_report: "Standalone report",
 };
 
 function fileLink(corpus, relativePath) {
@@ -630,6 +733,9 @@ function renderComplete(manifest, corpus) {
   });
   container.appendChild(topLevel);
 
+  // Phase 2 (condensation rates) before Phase 3 (distant reading), matching
+  // pipeline order -- Phase 3's distant-reading report is built from the
+  // Phase 2 condensations, so it belongs after them here too.
   Object.entries(manifest.rates || {}).forEach(([rate, files]) => {
     const card = document.createElement("div");
     card.className = "card file-links";
@@ -644,6 +750,26 @@ function renderComplete(manifest, corpus) {
     });
     container.appendChild(card);
   });
+
+  if (manifest.distant_reading_report || manifest.distant_reading_note) {
+    const phase3Card = document.createElement("div");
+    phase3Card.className = "card file-links";
+    phase3Card.innerHTML = "<h3>Phase 3 / distant reading</h3>";
+    if (manifest.distant_reading_report) {
+      const a = document.createElement("a");
+      a.textContent = "Distant reading report";
+      a.href = fileLink(corpus, manifest.distant_reading_report);
+      a.target = "_blank";
+      phase3Card.appendChild(a);
+    }
+    if (manifest.distant_reading_note) {
+      const note = document.createElement("p");
+      note.className = "hint";
+      note.textContent = `Contexts/Collocates comparison skipped -- ${manifest.distant_reading_note}.`;
+      phase3Card.appendChild(note);
+    }
+    container.appendChild(phase3Card);
+  }
 
   currentManifestRates = Object.keys(manifest.rates || {}).map(Number).sort((a, b) => a - b);
   $("#regenerate-panel").classList.toggle("hidden", currentManifestRates.length === 0);

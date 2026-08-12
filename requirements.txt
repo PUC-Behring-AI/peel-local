@@ -34,5 +34,9 @@ numpy
 tqdm
 requests
 
+# Phase 3: distant-reading + source-vs-summary comparison report
+scipy
+wordcloud
+
 # Web interface (webapp/)
 flask
