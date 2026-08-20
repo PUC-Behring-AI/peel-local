@@ -64,6 +64,22 @@ own cleanly styled page.
 
 ---
 
+## `common/file_convert.py`
+
+Converts a corpus input file to plain text before it's placed at
+`data/<corpus>/raw/<corpus>.txt`, regardless of source format -- the one
+implementation of "what counts as a supported input format" shared by
+the web upload handler and `run_pipeline.py`'s `--input`.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `convert_to_text(raw_bytes, filename)` | Dispatches on `filename`'s extension (`.txt`, `.md`/`.markdown`, `.pdf`); raises `ValueError` for anything else or an unextractable PDF | `webapp/pipeline_session.py::PipelineSession.start`, `run_pipeline.py::place_raw_text` |
+| `_pdf_to_text(raw_bytes)` | Extracts text page by page via `pypdf` | `convert_to_text` |
+| `_markdown_to_text(text)` | Regex-based markdown-to-prose pass (headings, emphasis, links/images, code fences, lists, tables, HTML tags stripped -- text kept) | `convert_to_text` |
+| `_normalize_newlines(text)` | Collapses `\r\n`/`\r` to `\n` -- reading raw bytes (required for PDF support) skips Python's usual universal-newline translation | `convert_to_text` |
+
+---
+
 ## `phase0/clean_corpus.py`
 
 Corpus cleaning: removes page numbers, running headers/footers,

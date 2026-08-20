@@ -38,7 +38,7 @@ from nltk.stem import PorterStemmer
 
 from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import standalone_report
+from common import standalone_report, file_convert
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
@@ -142,7 +142,13 @@ class PipelineSession:
         self.decisions2 = DecisionLog(corpus_name, phase="phase2")
         self.config = config
 
-        raw_text = file_storage.read().decode("utf-8")
+        # .txt/.md/.markdown/.pdf all funnel through the same converter --
+        # whatever format was uploaded, raw/<corpus>.txt always ends up
+        # holding plain text. Errors from here (unsupported extension,
+        # non-UTF-8 .txt/.md, an unextractable PDF) propagate to the
+        # caller (app.py's /api/start), same as before this format
+        # support existed.
+        raw_text = file_convert.convert_to_text(file_storage.read(), file_storage.filename)
         # Kept verbatim (pre-Phase-0) specifically for source-metadata
         # detection below -- title/author/date front matter sits at the
         # very start of the document, and Phase 0 cleaning isn't

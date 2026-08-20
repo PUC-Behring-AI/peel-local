@@ -190,10 +190,10 @@ data/<CORPUS_NAME>/
     └── phase3_decisions.jsonl
 ```
 
-`data/` is git-ignored (generated/corpus-specific content shouldn't pile
-up in version control), with one deliberate exception: `data/Boisseau/phase1/*`
-is committed as a worked example, carried over from this repo's earlier
-`phase1/results/` folder.
+`data/` is git-ignored, with no exceptions -- generated/corpus-specific
+content shouldn't pile up in version control. There's no example corpus
+bundled with the repo; `raw/<CORPUS_NAME>.txt` always comes from your own
+input file (see below).
 
 ---
 
@@ -201,8 +201,18 @@ is committed as a worked example, carried over from this repo's earlier
 
 ### Notebook by notebook
 
-Example using the `Boisseau` corpus already included under
-`data/Boisseau/raw/Boisseau.txt`:
+The notebooks expect `data/<CORPUS_NAME>/raw/<CORPUS_NAME>.txt` to
+already exist as plain text -- unlike `run_pipeline.py` and the web
+interface, they don't place or convert it for you. If your source is
+already a `.txt` file, just copy it there. If it's a PDF or Markdown
+file, convert it first with the same converter those two use
+(`common/file_convert.py`):
+```bash
+python -c "from pathlib import Path; from common.file_convert import convert_to_text; \
+d = Path('data/<CORPUS_NAME>/raw'); d.mkdir(parents=True, exist_ok=True); \
+src = Path('your_source.pdf'); \
+(d / '<CORPUS_NAME>.txt').write_text(convert_to_text(src.read_bytes(), src.name), encoding='utf-8')"
+```
 
 1. **Phase 0** (optional cleaning step): run as a script (also importable
    as `phase0.clean_corpus`, used by `phase0.ipynb` and `run_pipeline.py`):
@@ -211,21 +221,19 @@ Example using the `Boisseau` corpus already included under
    ```
    Place the cleaned output at `data/<CORPUS_NAME>/raw/<CORPUS_NAME>.txt`
    if you want Phase 1 to analyze the cleaned version.
-2. **Phase 1**: open `phase1/phase1.ipynb`, set `CORPUS_NAME = "Boisseau"`
-   in the config cell, and run all cells top to bottom. You'll be
-   prompted to review GlossBERT's flagged sense mismatches and the
-   resulting clusters along the way.
-3. **Phase 2**: open `phase2/phase2.ipynb`, set the same
-   `CORPUS_NAME = "Boisseau"`, and run all cells. It reads Phase 1's
-   state JSON directly from `data/Boisseau/phase1/`. The first four cells
-   select informative sentences per cluster; the remaining cells (optional)
-   generate and verify an LLM condensation -- see the next section.
+2. **Phase 1**: open `phase1/phase1.ipynb`, set `CORPUS_NAME` in the
+   config cell, and run all cells top to bottom. You'll be prompted to
+   review GlossBERT's flagged sense mismatches and the resulting
+   clusters along the way.
+3. **Phase 2**: open `phase2/phase2.ipynb`, set the same `CORPUS_NAME`,
+   and run all cells. It reads Phase 1's state JSON directly from
+   `data/<CORPUS_NAME>/phase1/`. The first four cells select informative
+   sentences per cluster; the remaining cells (optional) generate and
+   verify an LLM condensation -- see the next section.
 
-To analyze a new corpus, place its raw text at
-`data/<CORPUS_NAME>/raw/<CORPUS_NAME>.txt` and set `CORPUS_NAME`
-accordingly in both notebooks. Phase 3 has no notebook of its own -- it
-only runs as part of `run_pipeline.py` or the web interface, immediately
-after Phase 2's initial condensation rates (if any) are built. See
+Phase 3 has no notebook of its own -- it only runs as part of
+`run_pipeline.py` or the web interface, immediately after Phase 2's
+initial condensation rates (if any) are built. See
 [Phase 3 distant reading](#phase-3-distant-reading) below.
 
 ### All at once: `run_pipeline.py`
@@ -236,13 +244,20 @@ in a single command, with the exact same interactive prompts, outputs,
 and decision logs as running the two notebooks by hand plus Phase 3's
 own automatic step (it calls the same
 `pipeline.py`/`condense.py`/`condensation_report.py`/`standalone_report.py`
-functions -- nothing is reimplemented):
+functions -- nothing is reimplemented). `--input` accepts `.txt`,
+`.md`/`.markdown`, or `.pdf` -- all three are converted to plain text
+(`common/file_convert.py`) and written to
+`data/<CORPUS_NAME>/raw/<CORPUS_NAME>.txt` before Phase 1 runs:
 
 ```bash
-python run_pipeline.py --corpus Boisseau --input path/to/raw.txt
-python run_pipeline.py --corpus Boisseau --input path/to/raw.txt --clean
-python run_pipeline.py --corpus Boisseau --input path/to/raw.txt --rates 10,20 --ollama-model llama3 --max-trials 3
+python run_pipeline.py --corpus MyCorpus --input path/to/raw.txt
+python run_pipeline.py --corpus MyCorpus --input path/to/raw.pdf --clean
+python run_pipeline.py --corpus MyCorpus --input path/to/raw.md --rates 10,20 --ollama-model llama3 --max-trials 3
 ```
+
+A PDF's extracted text often carries running headers/footers, page
+numbers, and hyphenation breaks from the original layout -- `--clean` is
+worth turning on more often than not for a PDF-sourced corpus.
 
 `--clean` runs Phase 0 first. Every Phase 1/Phase 2 config constant
 (percentiles, stem/cluster limits, model names, ...) is available as a
@@ -493,9 +508,11 @@ it resumes the pipeline in the background.
 
 ### Screens, in order
 
-1. **Setup** -- corpus name, `.txt` file upload, optional "clean with
-   Phase 0" checkbox, and a collapsible advanced-settings panel with
-   every Phase 1 config field (same defaults as the CLI).
+1. **Setup** -- corpus name, file upload (`.txt`, `.md`/`.markdown`, or
+   `.pdf` -- converted to plain text the same way `run_pipeline.py`'s
+   `--input` is), optional "clean with Phase 0" checkbox, and a
+   collapsible advanced-settings panel with every Phase 1 config field
+   (same defaults as the CLI).
 2. **Progress console** -- live log panel + current step name.
 3. **Flagged-term review** -- one row per flagged term, with the
    sentence, default vs. predicted definition, and a choice control

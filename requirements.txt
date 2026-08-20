@@ -34,6 +34,10 @@ numpy
 tqdm
 requests
 
+# Corpus input conversion (Phase 0 input / webapp upload): PDF text extraction.
+# .txt and .md/.markdown need no extra library -- see common/file_convert.py.
+pypdf
+
 # Phase 3: distant-reading + source-vs-summary comparison report
 scipy
 wordcloud

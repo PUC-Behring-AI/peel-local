@@ -11,14 +11,18 @@ phase2/condensation_report.py, phase3/pipeline.py,
 common/standalone_report.py functions the notebooks call. Nothing here
 is duplicated logic. See RUN_PIPELINE_GUIDE.md for a detailed usage guide.
 
+--input accepts .txt, .md/.markdown, or .pdf -- all three are converted
+to plain text (common/file_convert.py) before being written to
+data/<CORPUS_NAME>/raw/<CORPUS_NAME>.txt, the same as the web interface's
+upload handler.
+
 Usage:
     python run_pipeline.py --corpus Boisseau --input raw.txt
-    python run_pipeline.py --corpus Boisseau --input raw.txt --clean
-    python run_pipeline.py --corpus Boisseau --input raw.txt --rates 10,20 --ollama-model llama3 --max-trials 3
+    python run_pipeline.py --corpus Boisseau --input raw.pdf --clean
+    python run_pipeline.py --corpus Boisseau --input raw.md --rates 10,20 --ollama-model llama3 --max-trials 3
 """
 
 import argparse
-import shutil
 import tempfile
 from pathlib import Path
 
@@ -28,7 +32,7 @@ from nltk.stem import PorterStemmer
 
 from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import standalone_report
+from common import standalone_report, file_convert
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
@@ -40,7 +44,8 @@ def parse_args():
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--corpus", required=True, help="Corpus name -- used for data/<corpus>/ paths")
-    parser.add_argument("--input", required=True, help="Path to the raw .txt file for this corpus")
+    parser.add_argument("--input", required=True,
+                         help="Path to the raw corpus file (.txt, .md/.markdown, or .pdf)")
     parser.add_argument("--clean", action="store_true",
                          help="Run Phase 0 cleaning (phase0/clean_corpus.py) before Phase 1")
 
@@ -73,16 +78,28 @@ def parse_args():
 
 
 def place_raw_text(args, paths):
+    """Converts --input (.txt/.md/.markdown/.pdf, see common/file_convert.py)
+    to plain text, optionally Phase-0-cleans it, and writes the result to
+    paths.raw_txt(). Returns the converted-but-not-yet-cleaned text --
+    run_phase2 needs that exact pre-clean version for source-metadata
+    detection (see its own docstring), so it's returned here rather than
+    re-read from --input a second time, which would break for a PDF
+    (binary, not directly re-readable as text) and skip markdown
+    conversion for a .md input."""
+    with open(args.input, "rb") as f:
+        raw_bytes = f.read()
+    raw_text = file_convert.convert_to_text(raw_bytes, args.input)
+
     if args.clean:
-        with open(args.input, encoding="utf-8") as f:
-            raw = f.read()
-        cleaned = clean_text(raw)
-        with open(paths.raw_txt(), "w", encoding="utf-8") as f:
-            f.write(cleaned)
+        text_to_write = clean_text(raw_text)
         print(f"Phase 0: cleaned corpus written to {paths.raw_txt()}")
     else:
-        shutil.copy(args.input, paths.raw_txt())
-        print(f"Copied raw corpus to {paths.raw_txt()}")
+        text_to_write = raw_text
+        print(f"Converted corpus written to {paths.raw_txt()}")
+    with open(paths.raw_txt(), "w", encoding="utf-8") as f:
+        f.write(text_to_write)
+
+    return raw_text
 
 
 def resolve_condensation_config(args, decisions):
@@ -488,8 +505,11 @@ def run_phase3(args, paths, phase1_state, nlp, stemmer, text, condensed_texts):
     print(f"\nDistant reading report written to {paths.distant_reading_report_path()}")
 
 
-def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text):
-    """Mirrors phase2.ipynb cell-by-cell."""
+def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text, original_text):
+    """Mirrors phase2.ipynb cell-by-cell. `original_text`: the
+    place_raw_text() return value -- --input converted to plain text but
+    not yet Phase-0-cleaned (regardless of source format), needed for
+    metadata detection below."""
     enriched_state = phase2_pipeline.enrich_with_informative_sentences(
         phase1_state, text, nlp, stemmer,
         top_n=args.top_n, density_percentile=args.density_percentile,
@@ -505,8 +525,6 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text):
     # and Phase 0 cleaning isn't guaranteed to leave it alone (e.g. a
     # title that also repeats as a running header gets stripped as a
     # recurring short line).
-    with open(args.input, encoding="utf-8") as f:
-        original_text = f.read()
     title, authors, date = condense.run_source_metadata_setup(decisions, original_text, ollama_model)
 
     ordered_sentences = condense.gather_ordered_informative_sentences(enriched_state)
@@ -544,13 +562,13 @@ def main():
     paths = CorpusPaths(args.corpus)
     paths.ensure_dirs()
 
-    place_raw_text(args, paths)
+    original_text = place_raw_text(args, paths)
 
     decisions1 = DecisionLog(args.corpus, phase="phase1")
     phase1_state, nlp, stemmer, text = run_phase1(args, paths, decisions1)
 
     decisions2 = DecisionLog(args.corpus, phase="phase2")
-    run_phase2(args, paths, decisions2, phase1_state, nlp, stemmer, text)
+    run_phase2(args, paths, decisions2, phase1_state, nlp, stemmer, text, original_text)
 
     print("\nPipeline complete.")
 

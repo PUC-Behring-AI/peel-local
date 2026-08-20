@@ -30,8 +30,11 @@
       </div>
 
       <div class="field">
-        <label for="file">Corpus text file (.txt)</label>
-        <input type="file" id="file" name="file" accept=".txt" required>
+        <label for="file">Corpus file (.txt, .md/.markdown, or .pdf)</label>
+        <input type="file" id="file" name="file" accept=".txt,.md,.markdown,.pdf" required>
+        <p class="hint">Markdown and PDF are both converted to plain text before analysis. A PDF's
+           extracted text often has running headers/footers, page numbers, and hyphenation breaks --
+           cleaning with Phase 0 below is worth turning on more often than not for one.</p>
       </div>
 
       <div class="field checkbox-field">

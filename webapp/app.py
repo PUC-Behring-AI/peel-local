@@ -92,7 +92,7 @@ def start():
 
     uploaded = request.files.get("file")
     if uploaded is None or uploaded.filename == "":
-        return _error("A .txt corpus file is required.")
+        return _error("A corpus file (.txt, .md/.markdown, or .pdf) is required.")
 
     clean = request.form.get("clean") in ("true", "on", "1")
 
@@ -111,7 +111,11 @@ def start():
     try:
         _session.start(corpus_name, uploaded, clean, config)
     except UnicodeDecodeError:
-        return _error("The uploaded file isn't valid UTF-8 text.")
+        return _error("The uploaded .txt/.md file isn't valid UTF-8 text.")
+    except ValueError as e:
+        # Unsupported extension, or a PDF with no extractable text (e.g.
+        # scanned/image-only) -- a bad-input problem, not a server error.
+        return _error(str(e))
     except Exception as e:  # noqa: BLE001 -- surfaced to the UI, not a bare crash
         return _error(f"Could not start the pipeline: {e}", 500)
 
