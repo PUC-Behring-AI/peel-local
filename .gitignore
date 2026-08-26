@@ -15,3 +15,8 @@ data/
 
 .DS_Store
 Thumbs.db
+
+# Pipeline-graph generator tooling (PEEL-Local-pipeline-overview.png/.pdf and
+# PEEL-Local-pipeline-full.html at the repo root are the committed deliverables;
+# the code/data/vendored binaries that produce them are not).
+docgraph/
