@@ -9,10 +9,6 @@ __pycache__/
 GlossBERT_Checkpoint/
 **/GlossBERT_Checkpoint/
 
-# Generated/corpus-specific artifacts -- no exceptions. Example corpora
-# (Boisseau, etc.) and their outputs are local-only, not committed.
-data/
-
 .DS_Store
 Thumbs.db
 

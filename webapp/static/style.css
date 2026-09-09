@@ -42,9 +42,11 @@ body {
   padding: 1.5rem 0 1rem;
   margin-bottom: 2rem;
 }
+.app-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .app-header h1 { margin: 0 0 0.3rem; color: var(--accent); }
 .app-header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .app-header a { color: var(--accent); }
+#header-restart { flex: 0 0 auto; white-space: nowrap; }
 
 h2 { color: var(--accent); border-bottom: 1px solid var(--accent-light); padding-bottom: 0.4rem; }
 
@@ -52,6 +54,10 @@ h2 { color: var(--accent); border-bottom: 1px solid var(--accent-light); padding
 .hidden { display: none; }
 
 .hint { color: var(--muted); font-size: 0.9rem; }
+.hint.warn { color: var(--danger); background: var(--danger-bg); padding: 0.5rem 0.7rem; border-radius: 6px; }
+
+.section-header { color: var(--accent); margin: 1.5rem 0 0.6rem; font-size: 1.05rem; }
+.section-header:first-child { margin-top: 0; }
 
 .field { margin-bottom: 1.1rem; }
 .field label { display: block; font-weight: 600; margin-bottom: 0.3rem; }

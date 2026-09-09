@@ -38,7 +38,7 @@ from nltk.stem import PorterStemmer
 
 from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import standalone_report, file_convert
+from common import standalone_report, file_convert, parameter_sweep, resume
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
@@ -71,6 +71,7 @@ class PipelineSession:
         self.error = None
         self.manifest = None
         self.corpus_name = None
+        self.doc = None
         self._log_parts = []
         self._regen_rate = None  # set while a post-completion regeneration is in flight
 
@@ -132,7 +133,7 @@ class PipelineSession:
     # ------------------------------------------------------------
 
     def start(self, corpus_name, file_storage, clean: bool, config: dict):
-        """config: dict with top_percentile, max_stems, max_sentences_per_stem,
+        """config: dict with frequency_percentile, max_stems, max_sentences_per_stem,
         max_synsets, max_cluster_size, min_clusters, min_cluster_len,
         glossbert_model, lang_model, sentence_embedder (already typed by app.py)."""
         self.corpus_name = corpus_name
@@ -160,7 +161,10 @@ class PipelineSession:
         with open(self.paths.raw_txt(), "w", encoding="utf-8") as f:
             f.write(clean_text(raw_text) if clean else raw_text)
 
-        self._run_bg(self._step_start_to_flagged_review, "Extracting stems & running GlossBERT analysis")
+        if self.config.get("run_parameter_sweep"):
+            self._run_bg(self._step_run_parameter_sweep, "Sweeping frequency_percentile candidates")
+        else:
+            self._run_bg(self._step_start_to_flagged_review, "Extracting stems & running GlossBERT analysis")
 
     def detect_metadata(self, ollama_model):
         """Runs extract_source_metadata against the untouched pre-Phase-0
@@ -185,13 +189,128 @@ class PipelineSession:
         return {"title": title, "authors": authors, "date": date}
 
     # ------------------------------------------------------------
-    # PHASE 1: stems -> GlossBERT -> flagged-term review
+    # ALTERNATIVE ENTRY POINT: resume an existing corpus at Phase 2 or 3
     # ------------------------------------------------------------
 
-    def _step_start_to_flagged_review(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Using device: {self.device}")
+    def resume(self, corpus_name, start_phase: int, config: dict | None = None):
+        """Alternative to start(): resumes an already-existing corpus at
+        Phase 2 or 3 instead of uploading a new file and running from
+        Phase 1. Shares prerequisite-checking with the CLI's
+        --start-phase via common/resume.py -- a corpus missing a required
+        file from an earlier phase is rejected here with the exact same
+        check the CLI uses, not a second, possibly-inconsistent one.
+        Raises RuntimeError (caught by app.py's route) if prerequisites
+        aren't met; never partially starts."""
+        if start_phase not in (2, 3):
+            raise RuntimeError(f"resume() only supports start_phase 2 or 3, got {start_phase}")
 
+        self.corpus_name = corpus_name
+        self.paths = CorpusPaths(corpus_name)
+        self.config = config or {}
+
+        # Checked BEFORE creating anything else -- DecisionLog's own
+        # __init__ creates data/<corpus>/decisions/ on construction, and
+        # ensure_dirs() creates the rest, so both must wait until AFTER
+        # this check passes. Otherwise a failed check for a
+        # nonexistent/incomplete corpus would still leave behind a full
+        # tree of empty data/<corpus>/* directories (same fix as the
+        # CLI's --start-phase; see run_pipeline.py::main -- verified this
+        # exact leak happening here too before this ordering fix).
+        ok, missing, available_rates = resume.check_prerequisites(self.paths, start_phase)
+        if not ok:
+            raise RuntimeError(
+                f"Cannot resume corpus {corpus_name!r} at Phase {start_phase}: missing "
+                + "; ".join(missing)
+            )
+
+        self.paths.ensure_dirs()
+        self.decisions1 = DecisionLog(corpus_name, phase="phase1")
+        self.decisions2 = DecisionLog(corpus_name, phase="phase2")
+
+        if start_phase == 2:
+            self._run_bg(self._step_resume_at_phase2, "Resuming at Phase 2")
+        else:
+            self._resume_available_rates = available_rates
+            self._run_bg(self._step_resume_at_phase3, "Resuming at Phase 3")
+
+    def _resolve_lang_model(self):
+        """Recovers which spaCy model Phase 1 actually used from its own
+        decision log (see phase1_pipeline.log_phase1_config) -- older
+        runs that predate that logging fall back to the resume form's own
+        lang_model field, then the same default every interface uses."""
+        return (
+            resume.find_last_decision_choice(self.corpus_name, "phase1", "lang_model_choice")
+            or self.config.get("lang_model", "en_core_web_sm")
+        )
+
+    def _step_resume_at_phase2(self):
+        """Loads everything a normal run's _step_finish_phase1 would
+        already have produced, from disk instead -- then returns the
+        exact same "phase2_setup" decision-gate shape, so the existing
+        Phase 2 setup screen and everything downstream of it
+        (apply_phase2_setup onward) runs completely unmodified."""
+        self.phase1_state = phase2_pipeline.load_phase1_state(self.paths.phase1_state_json())
+        with open(self.paths.raw_txt(), "r", encoding="utf-8") as f:
+            self.text = f.read()
+        # The true pre-Phase-0-clean original text (see start()) only
+        # ever existed in memory during the original run, never
+        # persisted -- source-metadata detection falls back to the saved
+        # raw text instead, which may already be Phase-0-cleaned.
+        self._raw_source_text = self.text
+        self.nlp = spacy.load(self._resolve_lang_model())
+        self.stemmer = PorterStemmer()
+        self.doc = None
+
+        print(f"Resumed corpus {self.corpus_name!r} at Phase 2 (loaded {self.paths.phase1_state_json()}).")
+        return {
+            "type": "phase2_setup",
+            "payload": {
+                "cluster_count": len(self.phase1_state.get("clusterDefs", [])),
+                "phase1_state_path": str(self.paths.phase1_state_json()),
+                "resumed": True,
+            },
+        }
+
+    def _step_resume_at_phase3(self):
+        """Loads everything a normal run would already have produced by
+        the time Phase 3 starts (Phase 1 state, corpus text, and every
+        already-generated condensed rate discovered on disk), rebuilds
+        the manifest those rates' own outputs already populate (so the
+        completion screen shows them, not just the freshly-rebuilt Phase
+        3 report), then hands off to the exact same _step_prepare_phase3
+        a normal run uses -- collocation-pair selection (if applicable)
+        and the distant-reading report build are completely unmodified."""
+        self.phase1_state = phase2_pipeline.load_phase1_state(self.paths.phase1_state_json())
+        with open(self.paths.raw_txt(), "r", encoding="utf-8") as f:
+            self.text = f.read()
+        self.nlp = spacy.load(self._resolve_lang_model())
+        self.stemmer = PorterStemmer()
+
+        self.condensed_texts = {}
+        for rate in self._resume_available_rates:
+            with open(self.paths.condensation_paths(rate)["condensed_text"], "r", encoding="utf-8") as f:
+                self.condensed_texts[rate] = f.read()
+
+        self.manifest = self._empty_manifest()
+        for rate in self._resume_available_rates:
+            output_paths = self.paths.condensation_paths(rate)
+            self.manifest["rates"][rate] = {k: self._rel(v) for k, v in output_paths.items()}
+            self.manifest["rates"][rate]["standalone_report"] = self._rel(self.paths.standalone_report_path(rate))
+
+        print(f"Resumed corpus {self.corpus_name!r} at Phase 3 "
+              f"(reusing rate(s): {self._resume_available_rates}).")
+        return self._step_prepare_phase3()
+
+    # ------------------------------------------------------------
+    # PHASE 1: optional parameter sweep -> stems -> GlossBERT -> flagged-term review
+    # ------------------------------------------------------------
+
+    def _step_run_parameter_sweep(self):
+        """Runs before stem extraction, only when the researcher opted into
+        the "run_parameter_sweep" checkbox. Sets up nlp/stemmer/text/doc
+        here (rather than only in _step_start_to_flagged_review) so the
+        sweep and the eventual real extraction share one spaCy parse --
+        see that step's `if self.doc is None` guard."""
         self.nlp = spacy.load(self.config["lang_model"])
         self.stemmer = PorterStemmer()
 
@@ -199,10 +318,56 @@ class PipelineSession:
             self.text = f.read()
         self.doc = self.nlp(self.text)
 
-        self.top_stems = phase1_pipeline.extract_top_stems(
-            self.doc, self.stemmer, self.config["top_percentile"], self.config["max_stems"]
+        word_frequency_percentile = self.config.get("word_frequency_percentile", 0.0)
+        rows = parameter_sweep.compute_sweep_report(
+            self.doc, self.text, self.nlp, self.stemmer,
+            word_frequency_percentile=word_frequency_percentile,
         )
-        print(f"Selected {len(self.top_stems)} top stems")
+        self.decisions1.record(
+            step="phase1_parameter_sweep", decision_type="sweep_shown",
+            prompt="Frequency-percentile sweep candidates", choice=None,
+            extra={
+                "candidates": rows, "max_stems": self.config["max_stems"],
+                "word_frequency_percentile": word_frequency_percentile, "source": "web",
+            },
+        )
+        return {
+            "type": "parameter_sweep",
+            "payload": {"candidates": rows, "max_stems": self.config["max_stems"]},
+        }
+
+    def apply_parameter_sweep(self, choice, frequency_percentile, max_stems):
+        self.decisions1.record(
+            step="phase1_parameter_sweep", decision_type="frequency_percentile_choice",
+            prompt="Pick a candidate, or provide a custom frequency_percentile/max_stems",
+            choice=choice,
+            extra={
+                "resolved_frequency_percentile": frequency_percentile, "resolved_max_stems": max_stems,
+                "custom": choice == "custom", "source": "web",
+            },
+        )
+        self.config["frequency_percentile"] = frequency_percentile
+        self.config["max_stems"] = max_stems
+        self._run_bg(self._step_start_to_flagged_review, "Extracting stems & running GlossBERT analysis")
+
+    def _step_start_to_flagged_review(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {self.device}")
+
+        if self.doc is None:
+            self.nlp = spacy.load(self.config["lang_model"])
+            self.stemmer = PorterStemmer()
+            with open(self.paths.raw_txt(), "r", encoding="utf-8") as f:
+                self.text = f.read()
+            self.doc = self.nlp(self.text)
+
+        self.top_stems = phase1_pipeline.extract_top_stems(
+            self.doc, self.stemmer, self.config["frequency_percentile"], self.config["max_stems"]
+        )
+        cap_note = phase1_pipeline.describe_stem_cap(
+            self.top_stems, self.doc, self.stemmer, self.config["frequency_percentile"], self.config["max_stems"]
+        )
+        print(f"Selected {len(self.top_stems)} top stems" + (f" {cap_note}" if cap_note else ""))
 
         with open(self.paths.top_stems(), "w", encoding="utf-8") as out:
             out.write("stem\tcount\n")
@@ -215,13 +380,41 @@ class PipelineSession:
         print("GlossBERT loaded successfully.")
 
         self.stem_occurrences = phase1_pipeline.map_stems_to_sentences(self.doc, self.top_stems, self.stemmer)
+        word_frequency_percentile = self.config.get("word_frequency_percentile", 0.0)
+        if word_frequency_percentile > 0:
+            self.stem_occurrences = phase1_pipeline.filter_stem_occurrences_by_word_frequency(
+                self.stem_occurrences, word_frequency_percentile,
+            )
+            print(f"Filtered derived words to word_frequency_percentile={word_frequency_percentile}")
+
+        phase1_pipeline.log_phase1_config(self.decisions1, {
+            "frequency_percentile": self.config["frequency_percentile"],
+            "max_stems": self.config["max_stems"],
+            "word_frequency_percentile": word_frequency_percentile,
+            "max_sentences_per_stem": self.config["max_sentences_per_stem"],
+            "max_synsets": self.config["max_synsets"],
+            "merge_duplicate_word_occurrences": self.config["merge_duplicate_word_occurrences"],
+            "max_cluster_size": self.config["max_cluster_size"],
+            "min_clusters": self.config["min_clusters"],
+            "min_cluster_len": self.config["min_cluster_len"],
+            "glossbert_model": self.config["glossbert_model"],
+            "lang_model": self.config["lang_model"],
+            "sentence_embedder": self.config["sentence_embedder"],
+        }, source="web")
 
         print("Running GlossBERT analysis...")
         self.accepted_definitions, self.flagged_words = phase1_pipeline.run_glossbert_analysis(
             self.top_stems, self.stem_occurrences, self.tokenizer, self.model, self.device,
             max_sentences_per_stem=self.config["max_sentences_per_stem"], max_synsets=self.config["max_synsets"],
+            merge_duplicate_word_occurrences=self.config["merge_duplicate_word_occurrences"],
         )
         print(f"Done. {len(self.flagged_words)} flagged term(s) need review.")
+        excluded_note = phase1_pipeline.describe_wordnet_excluded_stems(
+            self.stem_occurrences, max_sentences_per_stem=self.config["max_sentences_per_stem"],
+            merge_duplicate_word_occurrences=self.config["merge_duplicate_word_occurrences"],
+        )
+        if excluded_note:
+            print(excluded_note)
 
         if not self.flagged_words:
             print("No flagged terms found -- skipping straight to cluster review.")
@@ -265,6 +458,9 @@ class PipelineSession:
                 definition = item["top_candidates"][entry["candidate_index"]]["definition"]
             elif choice == "manual":
                 definition = entry["manual_definition"]
+            elif choice == "delete":
+                phase1_pipeline.purge_word_from_occurrences(self.stem_occurrences, item["stem"], item["word"])
+                continue
             else:
                 raise ValueError(f"Unknown flagged-term choice: {choice!r}")
 
@@ -426,13 +622,18 @@ class PipelineSession:
     # ------------------------------------------------------------
 
     def apply_phase2_setup(self, top_n, density_percentile, run_condensation,
-                            rates_str, ollama_model, max_trials,
+                            rates_str, ollama_model, max_trials, adversarial_model=None,
                             title="", authors="", date=""):
         self.decisions2.record(
             step="phase2_setup", decision_type="sentence_selection_config",
             prompt="Phase 2 sentence-selection config",
             choice=f"top_n={top_n}, density_percentile={density_percentile}",
             extra={"source": "web"},
+        )
+        self.decisions2.record(
+            step="phase2_setup", decision_type="run_condensation_choice",
+            prompt="Generate a condensation?",
+            choice=str(run_condensation), extra={"source": "web"},
         )
 
         self.top_n = top_n
@@ -451,6 +652,7 @@ class PipelineSession:
         if run_condensation:
             self.rates = [int(r.strip()) for r in rates_str.split(",") if r.strip()]
             self.ollama_model = ollama_model
+            self.adversarial_model = (adversarial_model or "").strip() or ollama_model
             self.max_trials = max_trials
 
             self.decisions2.record(
@@ -462,6 +664,11 @@ class PipelineSession:
                 step="condensation_setup", decision_type="ollama_model_choice",
                 prompt="Which Ollama model would you like to use?",
                 choice=ollama_model, extra={"source": "web"},
+            )
+            self.decisions2.record(
+                step="condensation_setup", decision_type="adversarial_model_choice",
+                prompt="Which Ollama model should the adversarial reviewer use?",
+                choice=self.adversarial_model, extra={"source": "web"},
             )
             self.decisions2.record(
                 step="condensation_setup", decision_type="max_trials_choice",
@@ -718,6 +925,22 @@ class PipelineSession:
     # ------------------------------------------------------------
 
     def _step_injection_analysis(self):
+        self.adversarial_notices = {}
+        self._adversarial_issues_by_rate = {}
+        for rate in list(self.condensed_texts.keys()):
+            condensed_text, was_fixed, _, issues = condense.run_adversarial_review(
+                self.condensed_texts[rate], self.ordered_sentences, self._target_words_by_rate[rate],
+                self.corpus_name, self.adversarial_model, self.decisions2, rate,
+            )
+            if was_fixed:
+                self.condensed_texts[rate] = condensed_text
+                self._adversarial_issues_by_rate[rate] = issues
+                self.adversarial_notices[rate] = (
+                    f"Adversarial reviewer auto-fixed this condensation ({'; '.join(issues)}). "
+                    "The original text is preserved in the Phase 2 decision log."
+                )
+                print(f"{rate}%: {self.adversarial_notices[rate]}")
+
         for rate, condensed_text in self.condensed_texts.items():
             condensed_path = self.paths.condensation_paths(rate)["condensed_text"]
             with open(condensed_path, "w", encoding="utf-8") as f:
@@ -764,20 +987,38 @@ class PipelineSession:
         return enriched
 
     def apply_injection_review(self, reclassifications_by_rate):
-        """reclassifications_by_rate: {rate: {span_id: new_type_or_"keep"}}."""
+        """reclassifications_by_rate: {rate: {span_id: new_type_or_"keep"}}.
+
+        Logs original_type alongside new_type per span (not just the raw
+        "keep"/letter choice) -- parity with the CLI/notebook path's
+        run_injection_review, which already records both per flag. Without
+        this, a posterior check of the webapp's decision log alone can't
+        tell what a reclassified span's automatic label actually was
+        (recoverable before this only by cross-referencing the saved
+        injection report's own borderline_flags array, which happens to
+        keep an unmutated copy -- not something a decision-log reader
+        should have to know)."""
+        logged_decisions = {}
+        for rate_str, span_decisions in reclassifications_by_rate.items():
+            rate = int(rate_str)
+            spans_by_id = {s["span_id"]: s for s in self.injection_results[rate]["all_spans"]}
+            logged_decisions[rate_str] = {}
+            for span_id, choice in span_decisions.items():
+                span = spans_by_id.get(span_id)
+                original_type = span["type"] if span is not None else None
+                new_type = choice if choice in ("F", "T", "R", "C") else original_type
+                logged_decisions[rate_str][span_id] = {
+                    "original_type": original_type, "new_type": new_type,
+                }
+                if choice and choice != "keep" and span is not None:
+                    span["type"] = choice
+
         self.decisions2.record(
             step="injection_review", decision_type="borderline_reclassification_batch",
             prompt="Borderline reclassification (web batch)",
             choice=f"{len(reclassifications_by_rate)} rate(s) reviewed",
-            extra={"source": "web", "decisions": reclassifications_by_rate},
+            extra={"source": "web", "decisions": logged_decisions},
         )
-
-        for rate_str, span_decisions in reclassifications_by_rate.items():
-            rate = int(rate_str)
-            spans_by_id = {s["span_id"]: s for s in self.injection_results[rate]["all_spans"]}
-            for span_id, new_type in span_decisions.items():
-                if new_type and new_type != "keep" and span_id in spans_by_id:
-                    spans_by_id[span_id]["type"] = new_type
 
         # A regeneration in flight only ever reviews its own single rate --
         # finish just that rate instead of rebuilding every rate's reports.
@@ -799,6 +1040,7 @@ class PipelineSession:
         result = self.injection_results[rate]
         coverage = condense.compute_cluster_coverage(self.phase1_state, condensed_text, self.text, self.stemmer)
         self.coverage_results[rate] = coverage
+        adversarial_notice = getattr(self, "_adversarial_issues_by_rate", {}).get(rate)
 
         fragment = condensation_report.build_condensation_fragment(
             condensed_text, result["all_spans"], result["source_sentences"], coverage,
@@ -806,6 +1048,7 @@ class PipelineSession:
             source_word_count=condense.count_words(self.text),
             phase1_json_name=self.paths.phase1_state_json().name,
             title=self.title, authors=self.authors, date=self.date,
+            adversarial_notice=adversarial_notice,
         )
         self.fragments_by_rate[rate] = fragment
 
@@ -814,6 +1057,7 @@ class PipelineSession:
         human_report = condensation_report.build_human_report(
             result["all_spans"], result["borderline_flags"], coverage,
             result["stats"]["verbatim_overlap_pct"], result["stats"]["non_injected_pct"], sanity_issues,
+            adversarial_notice=adversarial_notice,
         )
         blocks = condensation_report.parse_condensed_blocks(condensed_text)
         plain_summary = condensation_report.build_plain_summary(blocks)
@@ -838,6 +1082,9 @@ class PipelineSession:
 
         self.manifest["rates"][rate] = {k: self._rel(v) for k, v in output_paths.items()}
         self.manifest["rates"][rate]["standalone_report"] = self._rel(self.paths.standalone_report_path(rate))
+        notice = getattr(self, "adversarial_notices", {}).get(rate)
+        if notice:
+            self.manifest["rates"][rate]["adversarial_notice"] = notice
 
         return fragment
 
@@ -1016,6 +1263,26 @@ class PipelineSession:
         the immediately-accepted path and the sanity-review-accepted
         path (_step_apply_sanity_review) -- both end up here once a rate
         has a final, accepted text."""
+        target_words = condense.target_word_count(self.text, rate)
+        condensed_text, was_fixed, _, issues = condense.run_adversarial_review(
+            condensed_text, self.ordered_sentences, target_words,
+            self.corpus_name, self.adversarial_model, self.decisions2, rate,
+        )
+        if not hasattr(self, "adversarial_notices"):
+            self.adversarial_notices = {}
+        if not hasattr(self, "_adversarial_issues_by_rate"):
+            self._adversarial_issues_by_rate = {}
+        if was_fixed:
+            self._adversarial_issues_by_rate[rate] = issues
+            self.adversarial_notices[rate] = (
+                f"Adversarial reviewer auto-fixed this condensation ({'; '.join(issues)}). "
+                "The original text is preserved in the Phase 2 decision log."
+            )
+            print(f"{rate}%: {self.adversarial_notices[rate]}")
+        else:
+            self.adversarial_notices.pop(rate, None)
+            self._adversarial_issues_by_rate.pop(rate, None)
+
         self.condensed_texts[rate] = condensed_text
 
         condensed_path = self.paths.condensation_paths(rate)["condensed_text"]

@@ -9,9 +9,14 @@
 <body>
 
 <header class="app-header">
-  <h1>PEEL-Local</h1>
-  <p>Interactive pipeline: Phase 0 (optional) &rarr; Phase 1 &rarr; Phase 2 &rarr; Phase 3 (distant reading) &rarr; standalone export.
-     See <a href="../RUN_PIPELINE_GUIDE.md" target="_blank">RUN_PIPELINE_GUIDE.md</a> for the CLI equivalent.</p>
+  <div class="app-header-row">
+    <div>
+      <h1>PEEL-Local</h1>
+      <p>Interactive pipeline: Phase 0 (optional) &rarr; Phase 1 &rarr; Phase 2 &rarr; Phase 3 (distant reading) &rarr; standalone export.
+         See <a href="../RUN_PIPELINE_GUIDE.md" target="_blank">RUN_PIPELINE_GUIDE.md</a> for the CLI equivalent.</p>
+    </div>
+    <button type="button" id="header-restart" class="secondary" title="Discard the current run and go back to the setup screen">Restart</button>
+  </div>
 </header>
 
 <main>
@@ -20,7 +25,15 @@
   <!-- SETUP -->
   <!-- ============================================================ -->
   <section id="screen-setup" class="screen">
-    <h2>1. Start a new run</h2>
+    <h2>1. Start a run</h2>
+
+    <div class="field">
+      <div class="yesno">
+        <button type="button" class="yesno-btn setup-mode-btn selected" data-value="new">New corpus</button>
+        <button type="button" class="yesno-btn setup-mode-btn" data-value="resume">Resume an existing corpus</button>
+      </div>
+    </div>
+
     <form id="setup-form">
       <div class="field">
         <label for="corpus_name">Corpus name</label>
@@ -46,13 +59,22 @@
         <summary>Advanced settings (Phase 1 tuning)</summary>
         <div class="grid">
           <div class="field">
-            <label for="top_percentile">Top percentile</label>
-            <input type="number" id="top_percentile" name="top_percentile" value="0.50" step="0.01" min="0.01" max="1">
-            <p class="hint">Fraction of most-frequent stems to consider.</p>
+            <label for="frequency_percentile">Frequency percentile</label>
+            <input type="number" id="frequency_percentile" name="frequency_percentile" value="0.50" step="0.01" min="0.01" max="1">
+            <p class="hint">Percentile cutoff on the frequency-ranked stem vocabulary. Higher = a stricter bar = fewer, more frequent stems (e.g. 0.75 keeps only the top 25% most-frequent stems).</p>
           </div>
           <div class="field">
             <label for="max_stems">Max stems</label>
             <input type="number" id="max_stems" name="max_stems" value="150" step="1" min="1">
+          </div>
+          <div class="field">
+            <label for="word_frequency_percentile">Word frequency percentile</label>
+            <input type="number" id="word_frequency_percentile" name="word_frequency_percentile" value="0.0" step="0.01" min="0" max="1">
+            <p class="hint">Percentile cutoff on each stem's OWN derived-word frequency ranking (0 = keep every derived word, i.e. no filtering). Higher = fewer, more frequent derived words considered per stem (e.g. 0.75 keeps only the top 25% most-frequent words derived from each stem) -- trims how many distinct words (like "observation"/"observes"/"observed" all under stem "observ") reach GlossBERT/flagged-term review. Always keeps at least one word per stem.</p>
+          </div>
+          <div class="field checkbox-field">
+            <label><input type="checkbox" id="run_parameter_sweep" name="run_parameter_sweep"> Preview frequency-percentile candidates before extracting stems</label>
+            <p class="hint">Tries several frequency-percentile values -- a larger value is a stricter cutoff and keeps <em>fewer</em> stems (matching the usual sense of a percentile cutoff, like "90th percentile" meaning "top 10%"), shown here uncapped by "Max stems" above so you see each candidate's true size -- and reports, for each, how many sentences contain a top-stem word and how many clear a few informativeness thresholds (reusing Phase 2's sentence-scoring), so you can pick one -- or type your own -- on the next screen, overriding "Frequency percentile"/"Max stems" above. Cheap: no GlossBERT/clustering run yet.</p>
           </div>
           <div class="field">
             <label for="max_sentences_per_stem">Max sentences per stem</label>
@@ -62,6 +84,10 @@
             <label for="max_synsets">Max synsets</label>
             <input type="number" id="max_synsets" name="max_synsets" value="5" step="1" min="1">
             <p class="hint">A ceiling, not a guarantee: this many candidate definitions are shown per flagged word <em>at most</em>. WordNet's actual sense count varies a lot by word and part of speech (e.g. "call" as a verb has 28 senses, but "human" as an adjective has only 3) -- a flagged word with few senses for its part of speech will show fewer candidates than this, no matter how high you set it.</p>
+          </div>
+          <div class="field checkbox-field">
+            <label><input type="checkbox" id="merge_duplicate_word_occurrences" name="merge_duplicate_word_occurrences"> Merge duplicate word occurrences before WSD</label>
+            <p class="hint">If a word occurs more than once among the sampled sentences and GlossBERT predicts a different sense each time, it would otherwise show up as more than one flagged-review item. Enabling this merges all of a word's sampled occurrences into one combined context and asks GlossBERT once per word instead of once per occurrence.</p>
           </div>
           <div class="field">
             <label for="max_cluster_size">Max cluster size</label>
@@ -93,6 +119,25 @@
       <button type="submit" class="primary">Start</button>
     </form>
     <p id="setup-error" class="error-text hidden"></p>
+
+    <div id="resume-panel" class="hidden">
+      <div class="field">
+        <label for="resume_corpus_name">Corpus</label>
+        <select id="resume_corpus_name" name="resume_corpus_name"></select>
+        <p class="hint" id="resume-corpus-hint">Loading corpora under data/...</p>
+      </div>
+      <div class="field">
+        <label for="resume_start_phase">Start from</label>
+        <select id="resume_start_phase" name="resume_start_phase"></select>
+        <p class="hint">Only phases this corpus currently has the required files for are offered --
+           Phase 2 needs a saved Phase 1 state; Phase 3 additionally needs at least one
+           already-generated condensed rate. Resuming reuses the corpus's saved raw text and
+           Phase 1 state as-is; it does not re-run Phase 1 (or, for Phase 3, Phase 2's
+           condensation generation).</p>
+      </div>
+      <button type="button" id="resume-submit" class="primary">Resume</button>
+    </div>
+    <p id="resume-error" class="error-text hidden"></p>
   </section>
 
   <!-- ============================================================ -->
@@ -103,6 +148,27 @@
     <p id="step-label" class="step-label"></p>
     <pre id="log-box" class="log-box"></pre>
     <pre id="error-box" class="error-box hidden"></pre>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PARAMETER SWEEP -->
+  <!-- ============================================================ -->
+  <section id="screen-parameter-sweep" class="screen hidden">
+    <h2>Frequency-percentile sweep</h2>
+    <p class="hint">frequency_percentile is a statistical percentile cutoff on the frequency-ranked
+       vocabulary -- a larger value is a stricter bar and keeps <em>fewer</em> stems (e.g. 0.75 keeps
+       only the top 25% most-frequent stems, matching the usual sense of "90th percentile" meaning
+       "top 10%"). "Stems" below is each candidate's true, uncapped count; max_stems still applies
+       afterward, to whichever value you pick. Pick one of the candidates below, or enter your own
+       frequency_percentile/max_stems. "Distinct derived words" and "Sentences w/ stem hit" already
+       reflect the "Word frequency percentile" setting from the setup screen, if you set one above 0 --
+       these are the real post-filter counts, not the unfiltered corpus. "Sentences w/ stem hit" is how
+       many sentences contain at least one (surviving) word from that candidate's stem set; "Informative
+       @Nth" is how many of those also clear the Nth lexical-density percentile (Phase 2's own
+       informative-sentence scoring, run here as a preview).</p>
+    <button type="button" class="primary submit-parameter-sweep">Continue</button>
+    <div id="parameter-sweep-list"></div>
+    <button type="button" class="primary submit-parameter-sweep">Continue</button>
   </section>
 
   <!-- ============================================================ -->
@@ -170,6 +236,11 @@
           <p id="ollama-status" class="hint"></p>
         </div>
         <div class="field">
+          <label for="adversarial_model">Adversarial reviewer model</label>
+          <select id="adversarial_model" name="adversarial_model"></select>
+          <p class="hint">Reviews the accepted condensation once more for abrupt endings, garbled text, or drift outside the source material, and fixes it if needed. Defaults to the same model as above.</p>
+        </div>
+        <div class="field">
           <label for="max_trials">Max generation trials before asking to escalate</label>
           <input type="number" id="max_trials" name="max_trials" value="3" step="1" min="1">
         </div>
@@ -194,7 +265,7 @@
         </div>
       </div>
 
-      <button type="submit" class="primary">Run Phase 2</button>
+      <button type="submit" id="phase2-submit" class="primary">Run Phase 2</button>
     </form>
   </section>
 

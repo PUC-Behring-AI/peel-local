@@ -1,0 +1,2011 @@
+{
+    "excludedNgrams": [
+        "agent matter",
+        "ai system éloïse",
+        "artificial system kind",
+        "certain way",
+        "conjoin issue trust",
+        "epistemic agent",
+        "epistemic dependence",
+        "expert subject matter",
+        "expertise reveal",
+        "form opacity",
+        "gain knowledge",
+        "human expertise",
+        "let simply",
+        "machine learning",
+        "matter fact",
+        "opaque ai technology",
+        "present form",
+        "system éloïse boisseau",
+        "trust agent",
+        "trust artificial system",
+        "trust human",
+        "trust human expert",
+        "trust place expert"
+    ],
+    "clusterDefs": [
+        {
+            "name": "action",
+            "stems": [
+                "action",
+                "causal",
+                "ration"
+            ],
+            "ngrams": [
+                "action decision"
+            ],
+            "excluded_stems": [
+                "agent"
+            ],
+            "excluded_ngrams": [
+                "trust agent",
+                "agent matter"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 390,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [
+                        "action decision"
+                    ],
+                    "sentence": "Given that the opacity of a human expert’s ****actions****, ****decisions****, and judgements usually does not prevent lay people from trusting them, this opacity is sometimes invoked to justify placing a similar level of trust in AI systems."
+                },
+                {
+                    "index": 316,
+                    "score": 1.322,
+                    "lexical_density": 0.4407,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [
+                        "action decision"
+                    ],
+                    "sentence": "The confusion at stake rests on a fraudulent assimilation of causes with reasons in the context of the explanation of ****actions****: where human ****actions**** and ****decisions**** do require to be explained by reasons, the outputs of AI systems can only be explained by causes (or metonymically by the reasons of their designers and/or users)."
+                },
+                {
+                    "index": 288,
+                    "score": 1.32,
+                    "lexical_density": 0.44,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [
+                        "action decision"
+                    ],
+                    "sentence": "As Jonathan Lowe noted (2009, p. 349), the ‘seemingly small step’ of turning the reasons for a person’s ****action**** or ****decision**** into the causes of their ****action**** or ****decision**** is in reality ‘an erroneous [step] of enormous magnitude’."
+                },
+                {
+                    "index": 104,
+                    "score": 0.9811,
+                    "lexical_density": 0.4906,
+                    "matched_stems": [
+                        "ration"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "They write that …\n\nA large part of human-level opacity stems from the fact that human agents are also frequently mistaken about their real (internal) motivations and processing logic, a fact that is often obscured by the ability of human decision makers to invent post hoc ****rationalizations****."
+                },
+                {
+                    "index": 103,
+                    "score": 0.8889,
+                    "lexical_density": 0.4444,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Finally, John Zerilli et al. (2019, p. 666) suggest that explaining human ****actions**** is all the more tricky because the agents themselves are sometimes unaware of their true motivations or what may have played a role in their reasoning."
+                }
+            ]
+        },
+        {
+            "name": "agent",
+            "stems": [
+                "agent",
+                "causal",
+                "term"
+            ],
+            "ngrams": [
+                "trust agent",
+                "agent matter"
+            ],
+            "excluded_stems": [
+                "abl",
+                "possibl"
+            ],
+            "excluded_ngrams": [],
+            "most_insightful_sentences": [
+                {
+                    "index": 118,
+                    "score": 1.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "term"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "To take one example, Evan Thompson et al. (2024, p. 169) rightly point out that expert Go players ‘use their finely honed pattern recognition skills, which they cannot verbalize or formulate in ****terms**** of explicit concepts and rules’."
+                },
+                {
+                    "index": 138,
+                    "score": 1.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "agent"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "For our purposes, this variety of opacity pushes the comparison between opaque artificial systems and human epistemic ****agents**** even further."
+                },
+                {
+                    "index": 321,
+                    "score": 1.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "agent"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Virtue epistemology emphasises the possession and exercise by an ****agent**** of particular skills or ‘epistemic virtues’ (Sosa, 1991; Zagzebski, 1996; Greco, 1999)."
+                },
+                {
+                    "index": 104,
+                    "score": 0.9811,
+                    "lexical_density": 0.4906,
+                    "matched_stems": [
+                        "agent"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "They write that …\n\nA large part of human-level opacity stems from the fact that human ****agents**** are also frequently mistaken about their real (internal) motivations and processing logic, a fact that is often obscured by the ability of human decision makers to invent post hoc rationalizations."
+                },
+                {
+                    "index": 6,
+                    "score": 0.9286,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "agent"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "These matters about trust, dependence and expertise in the context of knowledge acquisition, traditional as they are, are nowadays being revisited as our epistemic world is being redefined by the arrival of what might seem to be new epistemic ****agents****: artificial systems apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 200,
+                    "score": 0.9123,
+                    "lexical_density": 0.4561,
+                    "matched_stems": [
+                        "agent"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The reliability (the good track record) of these systems therefore makes them, it would seem, entirely honourable candidates to play the role just mentioned of epistemic resource for human ****agents**** (and in fact, current AI systems are regularly referred to as ‘epistemic technologies’ (Alvarado, 2023)."
+                },
+                {
+                    "index": 131,
+                    "score": 0.9048,
+                    "lexical_density": 0.4524,
+                    "matched_stems": [
+                        "agent"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The fourth variety of opacity that I want to consider here is quite singular insofar as it does not exclusively concern individuals who defer to a decision-making epistemic ****agent**** (lay people or nonexperts, in other words)."
+                },
+                {
+                    "index": 103,
+                    "score": 0.8889,
+                    "lexical_density": 0.4444,
+                    "matched_stems": [
+                        "agent"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Finally, John Zerilli et al. (2019, p. 666) suggest that explaining human actions is all the more tricky because the ****agents**** themselves are sometimes unaware of their true motivations or what may have played a role in their reasoning."
+                }
+            ]
+        },
+        {
+            "name": "character",
+            "stems": [
+                "charact",
+                "expert",
+                "human"
+            ],
+            "ngrams": [
+                "intellectual character",
+                "character expert",
+                "expert competence"
+            ],
+            "excluded_stems": [],
+            "excluded_ngrams": [],
+            "most_insightful_sentences": [
+                {
+                    "index": 353,
+                    "score": 2.6316,
+                    "lexical_density": 0.5263,
+                    "matched_stems": [
+                        "charact",
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [
+                        "intellectual character"
+                    ],
+                    "sentence": "4.5 Epistemic peers and disagreement\n\nThese remarks about machines’ lack of ****intellectual**** ****character**** allow us to return to the questions raised earlier: can artificial systems be ****experts**** in the same way that ****human**** beings can?"
+                },
+                {
+                    "index": 218,
+                    "score": 1.7027,
+                    "lexical_density": 0.5676,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4 Artificial ****experts**** versus ****human**** ****experts****\n\n4.1 Expertise, comprehension and justification\n\nThe veritistic conception, although it helps bringing to light some of the necessary characteristics of expertise, suffers from a number of limitations."
+                },
+                {
+                    "index": 81,
+                    "score": 1.5517,
+                    "lexical_density": 0.5172,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "To outline this general point, I shall take as a case study a family of positions in the literature on trust in AI systems that, on the contrary, specifically rely on attributing a form of expertise to AI systems by comparing certain characteristics of these systems with certain supposedly analogous characteristics of ****human**** ****experts****."
+                },
+                {
+                    "index": 146,
+                    "score": 1.5484,
+                    "lexical_density": 0.5161,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "3.2 Expertise, trust and credibility\n\nA dimension of expertise and trust placed in ****human**** ****experts**** is worth mentioning: that it is deeply social or even institutional in nature."
+                },
+                {
+                    "index": 40,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Therefore, modelling the trust we place in AI systems on the trust we place in ****human**** ****experts**** is a misguided (and potentially epistemic ally dangerous) attitude."
+                },
+                {
+                    "index": 155,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "She writes that …\n\nif we are interested in developing an approval process that could certify certain opaque AI technology and approve its use in particular contexts while all owing the technology to remain opaque, we might make progress on this issue by continuing research into the relevant features of familiar and successful practices of certifying ****human**** ****experts****."
+                },
+                {
+                    "index": 390,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Given that the opacity of a ****human**** ****expert****’s actions, decisions, and judgements usually does not prevent lay people from trusting them, this opacity is sometimes invoked to justify placing a similar level of trust in AI systems."
+                },
+                {
+                    "index": 30,
+                    "score": 1.4545,
+                    "lexical_density": 0.4848,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "According to these views, the AI system would then be considered a bona fide new ****expert****, no longer ****human**** but artificial in nature (Grote & Berens, 2020)."
+                },
+                {
+                    "index": 26,
+                    "score": 1.4286,
+                    "lexical_density": 0.4762,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "A somewhat recurrent hypothesis in the literature – sometimes stated explicitly, other times implicitly or underlyingly – is that the trust placed in these opaque systems should be modelled on the type of trust we ordinarily place in ****human**** ****experts****."
+                },
+                {
+                    "index": 389,
+                    "score": 1.4211,
+                    "lexical_density": 0.4737,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "I began by examining the main elements of the analogy, showing that they rest on the observation that several varieties of opacity are thought to arise in comparable ways in both ****human**** ****experts**** and AI systems."
+                },
+                {
+                    "index": 280,
+                    "score": 1.4118,
+                    "lexical_density": 0.4706,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "This remark is obviously in keeping with the trend in the literature identified and dis cussed here, which attempts to compare the opacity of AI systems with the opacity of ****human**** ****experts****."
+                },
+                {
+                    "index": 373,
+                    "score": 1.3929,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Considering a decision support system as an ****expert**** can lead ****human**** ****experts**** to grant too great a form of agency to the machine, insofar as the latter is in no way competent in the sense that interests us when we speak of expertise – i.e. a sense that goes beyond the simple veritistic framework."
+                },
+                {
+                    "index": 141,
+                    "score": 1.3684,
+                    "lexical_density": 0.4561,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Despite this disparity in the varieties of opacity, one conclusion seems to emerge (from these different fronts): that opacity – as a characteristic common to AI systems and ****human**** ****experts**** – can certainly be apprehended in a uniform manner when trust is granted to ****humans**** and when trust is granted to AI systems."
+                },
+                {
+                    "index": 355,
+                    "score": 1.3636,
+                    "lexical_density": 0.4545,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Finally, should the relationship between a ****human**** ****expert**** and an artificial system be seen as a relationship between epistemic peers?"
+                },
+                {
+                    "index": 98,
+                    "score": 1.3478,
+                    "lexical_density": 0.4493,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "There are several presentations of this conceptualisation of ****human**** reasoning and decision-making processes (which here concern both ****experts**** and nonexperts) based on the blackbox model.\n\nRoss (2022, p. 2) notes that …\n\nFor the vast majority of society, the evidence and reasoning processes of any\n\n****expert**** in a specialized field is opaque, a genuine ‘black box’."
+                },
+                {
+                    "index": 387,
+                    "score": 1.3421,
+                    "lexical_density": 0.4474,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "I simply wanted to establish that one particular strand of thinking in the literature on the subject (that draws a parallel between the opacity of AI systems and the opacity of ****human**** ****experts****) is misguided."
+                },
+                {
+                    "index": 8,
+                    "score": 1.3404,
+                    "lexical_density": 0.4468,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "These programs are proving to be extremely versatile: depending on the data they are ‘trained’ on, they can carry out tasks (hitherto exclusively reserved to ****human**** ****experts****) with a certain degree of autonomy and in a generally highly satisfactory manner."
+                },
+                {
+                    "index": 133,
+                    "score": 1.3333,
+                    "lexical_density": 0.4444,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "This form of opacity is reflected in the form of ‘cognitive processes underlying ****human**** choices’, which thus differ from the previously mentioned opacity of judgement linked to the non explicit nature of the method followed by an ****expert**** (the relational opacity of the ****expert****), and rather designates the presence in decision-making of what are often described as ‘implicit biases’ or ‘unconscious biases’ (Greenwald & Banaji, 1995)11."
+                },
+                {
+                    "index": 385,
+                    "score": 1.3279,
+                    "lexical_density": 0.4426,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The present paper aimed solely at questionning the assumption regularly found in a subset of the literature on AI epistemology that AI systems should (or even could) be considered analogous to ****human**** ****experts****, given that we (as nonexperts) supposedly find ourselves in the same opaque position when it comes to evaluating both of their results."
+                },
+                {
+                    "index": 282,
+                    "score": 1.3269,
+                    "lexical_density": 0.4423,
+                    "matched_stems": [
+                        "expert",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "There is indeed a great temptation to equate these two types of opacity: the opacity concerning the reasoning followed by the ****human**** ****expert**** (manifested by their inability to explain their decision) would be directly correlated with the opacity concerning the unintelligibility of the neuronal processes in their brain."
+                }
+            ]
+        },
+        {
+            "name": "epistemic",
+            "stems": [
+                "epistem",
+                "expertis",
+                "use"
+            ],
+            "ngrams": [
+                "epistemic dependence",
+                "epistemic agent",
+                "human expert",
+                "expertise reveal"
+            ],
+            "excluded_stems": [
+                "abil",
+                "expert",
+                "form",
+                "matter",
+                "subject",
+                "term"
+            ],
+            "excluded_ngrams": [
+                "expert subject matter",
+                "trust place expert",
+                "present form",
+                "form opacity",
+                "human expertise"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 1,
+                    "score": 2.7805,
+                    "lexical_density": 0.4634,
+                    "matched_stems": [
+                        "epistem",
+                        "expertis",
+                        "use"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic dependence",
+                        "expertise reveal"
+                    ],
+                    "sentence": "An overview of some of the major questions surrounding ****expertise**** further ****reveals**** the extent to which this notion of deference hinges on more general relationships of ‘****epistemic**** ****dependence****’, to ****use**** John Hardwig’s (1985) expression."
+                },
+                {
+                    "index": 6,
+                    "score": 1.8571,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "epistem",
+                        "expertis"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "These matters about trust, dependence and ****expertise**** in the context of knowledge acquisition, traditional as they are, are nowadays being revisited as our ****epistemic**** world is being redefined by the arrival of what might seem to be new ****epistemic**** ****agents****: artificial systems apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 218,
+                    "score": 1.7027,
+                    "lexical_density": 0.5676,
+                    "matched_stems": [
+                        "expertis"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "4 Artificial experts versus ****human**** ****experts****\n\n4.1 ****Expertise****, comprehension and justification\n\nThe veritistic conception, although it helps bringing to light some of the necessary characteristics of ****expertise****, suffers from a number of limitations."
+                },
+                {
+                    "index": 156,
+                    "score": 1.5652,
+                    "lexical_density": 0.5217,
+                    "matched_stems": [
+                        "expertis"
+                    ],
+                    "matched_ngrams": [
+                        "expertise reveal"
+                    ],
+                    "sentence": "This preliminary observation about the institutional or normative nature of ****expertise**** also ****reveals**** ****expertise****’s twofold character: both social and personal."
+                },
+                {
+                    "index": 81,
+                    "score": 1.5517,
+                    "lexical_density": 0.5172,
+                    "matched_stems": [
+                        "expertis"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "To outline this general point, I shall take as a case study a family of positions in the literature on trust in AI systems that, on the contrary, specifically rely on attributing a form of ****expertise**** to AI systems by comparing certain characteristics of these systems with certain supposedly analogous characteristics of ****human**** ****experts****."
+                },
+                {
+                    "index": 146,
+                    "score": 1.5484,
+                    "lexical_density": 0.5161,
+                    "matched_stems": [
+                        "expertis"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "3.2 ****Expertise****, trust and credibility\n\nA dimension of ****expertise**** and trust placed in ****human**** ****experts**** is worth mentioning: that it is deeply social or even institutional in nature."
+                },
+                {
+                    "index": 40,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "Therefore, modelling the trust we place in AI systems on the trust we place in ****human**** ****experts**** is a misguided (and potentially ****epistemic**** ally dangerous) attitude."
+                },
+                {
+                    "index": 138,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "For our purposes, this variety of opacity pushes the comparison between opaque artificial systems and human ****epistemic**** ****agents**** even further."
+                },
+                {
+                    "index": 155,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "use"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "She writes that …\n\nif we are interested in developing an approval process that could certify certain opaque AI technology and approve its ****use**** in particular contexts while all owing the technology to remain opaque, we might make progress on this issue by continuing research into the relevant features of familiar and successful practices of certifying ****human**** ****experts****."
+                },
+                {
+                    "index": 216,
+                    "score": 1.4211,
+                    "lexical_density": 0.4737,
+                    "matched_stems": [
+                        "epistem",
+                        "expertis"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The purely veritistic and functionalist conception of ****expertise****, thus, does not seem to exclude the possibility for artefacts to act as ****epistemic**** experts and hence ****epistemic**** peers, insofar as they provide broadly correct results."
+                },
+                {
+                    "index": 162,
+                    "score": 1.3953,
+                    "lexical_density": 0.4651,
+                    "matched_stems": [
+                        "expertis",
+                        "use"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The badge or socially assigned label of ****expertise**** refers, to quote Kyle Powys Whyte and Robert Crease (2010, p. 413), to ‘indicators […] actually ****used**** by others as the basis for trusting scientists’."
+                },
+                {
+                    "index": 373,
+                    "score": 1.3929,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "expertis"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "Considering a decision support system as an expert can lead ****human**** ****experts**** to grant too great a form of agency to the machine, insofar as the latter is in no way competent in the sense that interests us when we speak of ****expertise**** – i.e. a sense that goes beyond the simple veritistic framework."
+                },
+                {
+                    "index": 148,
+                    "score": 1.3714,
+                    "lexical_density": 0.4571,
+                    "matched_stems": [
+                        "epistem",
+                        "expertis"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The layperson’s trust in the expert is thus largely based on the existence of a certain number of ****epistemic**** institutions that are specifically endowed with the role of certification or authentication of ****expertise****."
+                },
+                {
+                    "index": 355,
+                    "score": 1.3636,
+                    "lexical_density": 0.4545,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "Finally, should the relationship between a ****human**** ****expert**** and an artificial system be seen as a relationship between ****epistemic**** peers?"
+                },
+                {
+                    "index": 131,
+                    "score": 1.3571,
+                    "lexical_density": 0.4524,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "The fourth variety of opacity that I want to consider here is quite singular insofar as it does not exclusively concern individuals who defer to a decision-making ****epistemic**** ****agent**** (lay people or nonexperts, in other words)."
+                },
+                {
+                    "index": 27,
+                    "score": 1.3333,
+                    "lexical_density": 0.4444,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic dependence"
+                    ],
+                    "sentence": "The rationale would be that the ****epistemic**** ****dependence**** to which we are subject in relation to deep learning-based systems would itself be similar or analogous to that which we experience in relatively ordinary situations of lay deference to the expert (Zerilli et al. 2019, London, 2019)."
+                },
+                {
+                    "index": 37,
+                    "score": 1.3235,
+                    "lexical_density": 0.4412,
+                    "matched_stems": [
+                        "expertis"
+                    ],
+                    "matched_ngrams": [
+                        "human expert"
+                    ],
+                    "sentence": "The fourth section of the paper will show the limits of this conception of ****expertise****, and will argue against conceptualising trust in artificial systems on the model of trust in ****human**** ****experts****."
+                },
+                {
+                    "index": 201,
+                    "score": 1.2857,
+                    "lexical_density": 0.6429,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Alvarado’s interesting characterisation mobilised here actually implies an ****epistemic**** gradation of artefacts."
+                },
+                {
+                    "index": 211,
+                    "score": 1.1667,
+                    "lexical_density": 0.5833,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "For example, Jens Christian Bjerring and Jacob Busch (2020, p. 3) state that …\n\ninsofar as AI systems will eventually outperform the best practitioners in specific medical domains, practitioners will have ****epistemic**** obligation to rely on these systems in medical decision making."
+                },
+                {
+                    "index": 95,
+                    "score": 1.1111,
+                    "lexical_density": 0.5556,
+                    "matched_stems": [
+                        "expertis"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Opacity would constitute an ordinary characteristic of ****expertise****."
+                }
+            ]
+        },
+        {
+            "name": "epistemic AI",
+            "stems": [
+                "artifici",
+                "sens"
+            ],
+            "ngrams": [
+                "trust artificial system",
+                "artificial system kind",
+                "epistemic dependence",
+                "epistemic agent"
+            ],
+            "excluded_stems": [
+                "epistem",
+                "point"
+            ],
+            "excluded_ngrams": [],
+            "most_insightful_sentences": [
+                {
+                    "index": 42,
+                    "score": 1.68,
+                    "lexical_density": 0.56,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [
+                        "trust artificial system"
+                    ],
+                    "sentence": "2 ****Trust**** in ****artificial**** ****systems****\n\n2.1 Trust and reliance\n\nLet us first make a few distinctions regarding this notion of trust visàvis ****artificial**** systems."
+                },
+                {
+                    "index": 138,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "For our purposes, this variety of opacity pushes the comparison between opaque ****artificial**** systems and human ****epistemic**** ****agents**** even further."
+                },
+                {
+                    "index": 6,
+                    "score": 1.3929,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "These matters about trust, dependence and expertise in the context of knowledge acquisition, traditional as they are, are nowadays being revisited as our epistemic world is being redefined by the arrival of what might seem to be new ****epistemic**** ****agents****: ****artificial**** systems apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 37,
+                    "score": 1.3235,
+                    "lexical_density": 0.4412,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [
+                        "trust artificial system"
+                    ],
+                    "sentence": "The fourth section of the paper will show the limits of this conception of expertise, and will argue against conceptualising ****trust**** in ****artificial**** ****systems**** on the model of trust in human experts."
+                },
+                {
+                    "index": 218,
+                    "score": 1.1351,
+                    "lexical_density": 0.5676,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4 ****Artificial**** experts versus human experts\n\n4.1 Expertise, comprehension and justification\n\nThe veritistic conception, although it helps bringing to light some of the necessary characteristics of expertise, suffers from a number of limitations."
+                },
+                {
+                    "index": 353,
+                    "score": 1.0526,
+                    "lexical_density": 0.5263,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4.5 Epistemic peers and disagreement\n\nThese remarks about machines’ lack of intellectual character allow us to return to the questions raised earlier: can ****artificial**** systems be experts in the same way that human beings can?"
+                },
+                {
+                    "index": 30,
+                    "score": 0.9697,
+                    "lexical_density": 0.4848,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "According to these views, the AI system would then be considered a bona fide new expert, no longer human but ****artificial**** in nature (Grote & Berens, 2020)."
+                },
+                {
+                    "index": 35,
+                    "score": 0.9697,
+                    "lexical_density": 0.4848,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "We shall see that this conceptualisation is based on the much dis cussed but ambiguous notion of opacity (which in fact crystallises many debates surrounding ****artificial**** decision-making systems)."
+                },
+                {
+                    "index": 174,
+                    "score": 0.963,
+                    "lexical_density": 0.4815,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "We could indeed very well imagine people being trained to recognise certain characteristics that have been designated upstream as qualifying criteria for expertise in ****artificial**** systems."
+                },
+                {
+                    "index": 373,
+                    "score": 0.9286,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "sens"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Considering a decision support system as an expert can lead human experts to grant too great a form of agency to the machine, insofar as the latter is in no way competent in the ****sense**** that interests us when we speak of expertise – i.e. a ****sense**** that goes beyond the simple veritistic framework."
+                },
+                {
+                    "index": 1,
+                    "score": 0.9268,
+                    "lexical_density": 0.4634,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "epistemic dependence"
+                    ],
+                    "sentence": "An overview of some of the major questions surrounding expertise further reveals the extent to which this notion of deference hinges on more general relationships of ‘****epistemic**** ****dependence****’, to use John Hardwig’s (1985) expression."
+                },
+                {
+                    "index": 355,
+                    "score": 0.9091,
+                    "lexical_density": 0.4545,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Finally, should the relationship between a human expert and an ****artificial**** system be seen as a relationship between epistemic peers?"
+                },
+                {
+                    "index": 131,
+                    "score": 0.9048,
+                    "lexical_density": 0.4524,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "The fourth variety of opacity that I want to consider here is quite singular insofar as it does not exclusively concern individuals who defer to a decision-making ****epistemic**** ****agent**** (lay people or nonexperts, in other words)."
+                },
+                {
+                    "index": 27,
+                    "score": 0.8889,
+                    "lexical_density": 0.4444,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "epistemic dependence"
+                    ],
+                    "sentence": "The rationale would be that the ****epistemic**** ****dependence**** to which we are subject in relation to deep learning-based systems would itself be similar or analogous to that which we experience in relatively ordinary situations of lay deference to the expert (Zerilli et al. 2019, London, 2019)."
+                },
+                {
+                    "index": 145,
+                    "score": 0.88,
+                    "lexical_density": 0.44,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Consequently, the problem now appears to be to determine how the question of the opacity of human experts’ decisions is usually dealt with and resolved, and then to apply a similar or equivalent recipe to solve that of the opacity of ****artificial**** decision-making systems."
+                },
+                {
+                    "index": 388,
+                    "score": 0.88,
+                    "lexical_density": 0.44,
+                    "matched_stems": [
+                        "artifici"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "5 Conclusion\nMy aim in this paper was to assess how far the analogy holds between the trust a layperson places in an expert and the trust – whether from a layperson or an expert – that a human being places in a deep learning-based ****artificial**** system."
+                }
+            ]
+        },
+        {
+            "name": "expectation",
+            "stems": [
+                "expect",
+                "matter",
+                "posit"
+            ],
+            "ngrams": [
+                "positive expectation"
+            ],
+            "excluded_stems": [
+                "agent"
+            ],
+            "excluded_ngrams": [
+                "trust agent",
+                "agent matter",
+                "matter fact"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 81,
+                    "score": 1.0345,
+                    "lexical_density": 0.5172,
+                    "matched_stems": [
+                        "posit"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "To outline this general point, I shall take as a case study a family of ****positions**** in the literature on trust in AI systems that, on the contrary, specifically rely on attributing a form of expertise to AI systems by comparing certain characteristics of these systems with certain supposedly analogous characteristics of human experts."
+                },
+                {
+                    "index": 219,
+                    "score": 0.96,
+                    "lexical_density": 0.48,
+                    "matched_stems": [
+                        "posit"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "In addition to an individual’s consistency in reaching the truth and producing knowledge, other characteristics or qualities are in fact frequently put forward and presented as potentially influencing ****positively**** or negatively the trust that people are prepared to place in the person they designate as an expert."
+                },
+                {
+                    "index": 242,
+                    "score": 0.9333,
+                    "lexical_density": 0.4667,
+                    "matched_stems": [
+                        "posit"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Other ****positions**** found in the recent literature on epistemic AI can be mentioned here."
+                },
+                {
+                    "index": 6,
+                    "score": 0.9286,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "matter"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "These ****matters**** about trust, dependence and expertise in the context of knowledge acquisition, traditional as they are, are nowadays being revisited as our epistemic world is being redefined by the arrival of what might seem to be new epistemic agents: artificial systems apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 244,
+                    "score": 0.9189,
+                    "lexical_density": 0.4595,
+                    "matched_stems": [
+                        "posit"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Of course, it is debatable to speak of the pro ****positional**** outputs of AI systems as a species of testimony if this type of testimony is precisely devoid of all the necessary properties of testimony."
+                },
+                {
+                    "index": 385,
+                    "score": 0.8852,
+                    "lexical_density": 0.4426,
+                    "matched_stems": [
+                        "posit"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The present paper aimed solely at questionning the assumption regularly found in a subset of the literature on AI epistemology that AI systems should (or even could) be considered analogous to human experts, given that we (as nonexperts) supposedly find ourselves in the same opaque ****position**** when it comes to evaluating both of their results."
+                }
+            ]
+        },
+        {
+            "name": "expertise",
+            "stems": [
+                "describ",
+                "justifi",
+                "knowledg"
+            ],
+            "ngrams": [
+                "gain knowledge",
+                "conception expertise",
+                "expertise ai system",
+                "describe expert",
+                "expertise opacity trust",
+                "trust ai system"
+            ],
+            "excluded_stems": [
+                "expert",
+                "expertis",
+                "hand",
+                "simpli",
+                "system",
+                "thing"
+            ],
+            "excluded_ngrams": [
+                "ai system éloïse",
+                "system éloïse boisseau",
+                "trust place expert"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 81,
+                    "score": 1.5517,
+                    "lexical_density": 0.5172,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "expertise ai system",
+                        "trust ai system"
+                    ],
+                    "sentence": "To outline this general point, I shall take as a case study a family of positions in the literature on ****trust**** in ****AI**** ****systems**** that, on the contrary, specifically rely on attributing a form of ****expertise**** to ****AI**** ****systems**** by comparing certain characteristics of these systems with certain supposedly analogous characteristics of human experts."
+                },
+                {
+                    "index": 0,
+                    "score": 1.5455,
+                    "lexical_density": 0.5152,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "expertise opacity trust",
+                        "trust ai system"
+                    ],
+                    "sentence": "****Expertise****, ****opacity****, and ****trust**** in ****AI**** ****systems****\n\nÉloïse Boisseau\n\n1 Introduction\n\nThe conjoined issues of the trust placed in experts and the deference shown by non-specialists toward them are well-established topics in social epistemology (Hardwig, 1985, 1991; Lackey, 2018; Goldman, 2001; Rolin, 2002; Whyte & Crease, 2010)."
+                },
+                {
+                    "index": 390,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "justifi"
+                    ],
+                    "matched_ngrams": [
+                        "trust ai system"
+                    ],
+                    "sentence": "Given that the opacity of a human expert’s actions, decisions, and judgements usually does not prevent lay people from trusting them, this opacity is sometimes invoked to ****justify**** placing a similar level of ****trust**** in ****AI**** ****systems****."
+                },
+                {
+                    "index": 235,
+                    "score": 1.0476,
+                    "lexical_density": 0.5238,
+                    "matched_stems": [
+                        "describ"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "It is used by human beings to ****describe**** (primarily) certain human beings with certain particular qualities or abilities."
+                },
+                {
+                    "index": 215,
+                    "score": 0.9804,
+                    "lexical_density": 0.4902,
+                    "matched_stems": [
+                        "describ"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "It is worth mentioning the definition given by these two authors of an epistemic disagreement between peers:\n\n‘peer disagreement’ ****describes**** cases of two (equally) competent peers with respect to a certain domain related activity, whereby both parties disagree with respect to a certain proposition."
+                },
+                {
+                    "index": 62,
+                    "score": 0.973,
+                    "lexical_density": 0.4865,
+                    "matched_stems": [
+                        "describ"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The trust that users place in their GPS (their reliance on its proper functioning) is then understood as what Mark Coeckelbergh (2012, p. 55) ultimately ****describes**** as a merely predictive trust."
+                },
+                {
+                    "index": 219,
+                    "score": 0.96,
+                    "lexical_density": 0.48,
+                    "matched_stems": [
+                        "knowledg"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "In addition to an individual’s consistency in reaching the truth and producing ****knowledge****, other characteristics or qualities are in fact frequently put forward and presented as potentially influencing positively or negatively the trust that people are prepared to place in the person they designate as an expert."
+                },
+                {
+                    "index": 216,
+                    "score": 0.9474,
+                    "lexical_density": 0.4737,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "conception expertise"
+                    ],
+                    "sentence": "The purely veritistic and functionalist ****conception**** of ****expertise****, thus, does not seem to exclude the possibility for artefacts to act as epistemic experts and hence epistemic peers, insofar as they provide broadly correct results."
+                },
+                {
+                    "index": 6,
+                    "score": 0.9286,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "knowledg"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "These matters about trust, dependence and expertise in the context of ****knowledge**** acquisition, traditional as they are, are nowadays being revisited as our epistemic world is being redefined by the arrival of what might seem to be new epistemic agents: artificial systems apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 193,
+                    "score": 0.9057,
+                    "lexical_density": 0.4528,
+                    "matched_stems": [
+                        "knowledg"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Goldman (2001, p. 92) defines the expert in a particular field as …\n\n(…) someone who possesses an extensive fund of ****knowledge**** (true belief) and a set of skills or methods for apt and successful deployment of this ****knowledge**** to new questions in the domain."
+                },
+                {
+                    "index": 152,
+                    "score": 0.8966,
+                    "lexical_density": 0.4483,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "trust ai system"
+                    ],
+                    "sentence": "It is relevant because it is sometimes presented as a tempting solution to partially resolve the issue of ****trust**** in ****AI**** ****systems**** in relation to their blackbox nature."
+                },
+                {
+                    "index": 133,
+                    "score": 0.8889,
+                    "lexical_density": 0.4444,
+                    "matched_stems": [
+                        "describ"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "This form of opacity is reflected in the form of ‘cognitive processes underlying human choices’, which thus differ from the previously mentioned opacity of judgement linked to the non explicit nature of the method followed by an expert (the relational opacity of the expert), and rather designates the presence in decision-making of what are often ****described**** as ‘implicit biases’ or ‘unconscious biases’ (Greenwald & Banaji, 1995)11."
+                },
+                {
+                    "index": 37,
+                    "score": 0.8824,
+                    "lexical_density": 0.4412,
+                    "matched_stems": [],
+                    "matched_ngrams": [
+                        "conception expertise"
+                    ],
+                    "sentence": "The fourth section of the paper will show the limits of this ****conception**** of ****expertise****, and will argue against conceptualising trust in artificial systems on the model of trust in human experts."
+                }
+            ]
+        },
+        {
+            "name": "human",
+            "stems": [
+                "epistem",
+                "human",
+                "knowledg",
+                "testimoni"
+            ],
+            "ngrams": [
+                "epistemic agent",
+                "acquire knowledge",
+                "place human expert"
+            ],
+            "excluded_stems": [
+                "artifici",
+                "let",
+                "notion",
+                "possibl",
+                "simpli",
+                "technolog",
+                "way"
+            ],
+            "excluded_ngrams": [
+                "epistemic dependence",
+                "gain knowledge",
+                "opaque ai technology",
+                "trust artificial system",
+                "let simply",
+                "trust human",
+                "certain way",
+                "artificial system kind"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 40,
+                    "score": 2.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem",
+                        "human"
+                    ],
+                    "matched_ngrams": [
+                        "place human expert"
+                    ],
+                    "sentence": "Therefore, modelling the trust we place in AI systems on the trust we ****place**** in ****human**** ****experts**** is a misguided (and potentially ****epistemic**** ally dangerous) attitude."
+                },
+                {
+                    "index": 138,
+                    "score": 2.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem",
+                        "human"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "For our purposes, this variety of opacity pushes the comparison between opaque artificial systems and ****human**** ****epistemic**** ****agents**** even further."
+                },
+                {
+                    "index": 6,
+                    "score": 1.8571,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "epistem",
+                        "knowledg"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "These matters about trust, dependence and expertise in the context of ****knowledge**** acquisition, traditional as they are, are nowadays being revisited as our ****epistemic**** world is being redefined by the arrival of what might seem to be new ****epistemic**** ****agents****: artificial systems apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 353,
+                    "score": 1.5789,
+                    "lexical_density": 0.5263,
+                    "matched_stems": [
+                        "epistem",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4.5 ****Epistemic**** peers and disagreement\n\nThese remarks about machines’ lack of intellectual character allow us to return to the questions raised earlier: can artificial systems be experts in the same way that ****human**** beings can?"
+                },
+                {
+                    "index": 146,
+                    "score": 1.5484,
+                    "lexical_density": 0.5161,
+                    "matched_stems": [
+                        "human"
+                    ],
+                    "matched_ngrams": [
+                        "place human expert"
+                    ],
+                    "sentence": "3.2 Expertise, trust and credibility\n\nA dimension of expertise and trust ****placed**** in ****human**** ****experts**** is worth mentioning: that it is deeply social or even institutional in nature."
+                },
+                {
+                    "index": 26,
+                    "score": 1.4286,
+                    "lexical_density": 0.4762,
+                    "matched_stems": [
+                        "human"
+                    ],
+                    "matched_ngrams": [
+                        "place human expert"
+                    ],
+                    "sentence": "A somewhat recurrent hypothesis in the literature – sometimes stated explicitly, other times implicitly or underlyingly – is that the trust placed in these opaque systems should be modelled on the type of trust we ordinarily ****place**** in ****human**** ****experts****."
+                },
+                {
+                    "index": 200,
+                    "score": 1.3684,
+                    "lexical_density": 0.4561,
+                    "matched_stems": [
+                        "epistem",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The reliability (the good track record) of these systems therefore makes them, it would seem, entirely honourable candidates to play the role just mentioned of ****epistemic**** resource for ****human**** agents (and in fact, current AI systems are regularly referred to as ‘****epistemic**** technologies’ (Alvarado, 2023)."
+                },
+                {
+                    "index": 355,
+                    "score": 1.3636,
+                    "lexical_density": 0.4545,
+                    "matched_stems": [
+                        "epistem",
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Finally, should the relationship between a ****human**** expert and an artificial system be seen as a relationship between ****epistemic**** peers?"
+                },
+                {
+                    "index": 131,
+                    "score": 1.3571,
+                    "lexical_density": 0.4524,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [
+                        "epistemic agent"
+                    ],
+                    "sentence": "The fourth variety of opacity that I want to consider here is quite singular insofar as it does not exclusively concern individuals who defer to a decision-making ****epistemic**** ****agent**** (lay people or nonexperts, in other words)."
+                },
+                {
+                    "index": 201,
+                    "score": 1.2857,
+                    "lexical_density": 0.6429,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Alvarado’s interesting characterisation mobilised here actually implies an ****epistemic**** gradation of artefacts."
+                },
+                {
+                    "index": 211,
+                    "score": 1.1667,
+                    "lexical_density": 0.5833,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "For example, Jens Christian Bjerring and Jacob Busch (2020, p. 3) state that …\n\ninsofar as AI systems will eventually outperform the best practitioners in specific medical domains, practitioners will have ****epistemic**** obligation to rely on these systems in medical decision making."
+                },
+                {
+                    "index": 218,
+                    "score": 1.1351,
+                    "lexical_density": 0.5676,
+                    "matched_stems": [
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4 Artificial experts versus ****human**** experts\n\n4.1 Expertise, comprehension and justification\n\nThe veritistic conception, although it helps bringing to light some of the necessary characteristics of expertise, suffers from a number of limitations."
+                },
+                {
+                    "index": 33,
+                    "score": 1.0968,
+                    "lexical_density": 0.5484,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The second section of the paper will offer a brief reflection on the trust ordinarily placed in ****epistemic**** instruments and the upheaval caused in this respect by current AI systems."
+                },
+                {
+                    "index": 326,
+                    "score": 1.0526,
+                    "lexical_density": 0.5263,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Competence, conscientious work, and ****epistemic**** self assessment are aspects of B’s ‘****epistemic**** character.’"
+                },
+                {
+                    "index": 235,
+                    "score": 1.0476,
+                    "lexical_density": 0.5238,
+                    "matched_stems": [
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "It is used by ****human**** beings to describe (primarily) certain ****human**** beings with certain particular qualities or abilities."
+                },
+                {
+                    "index": 81,
+                    "score": 1.0345,
+                    "lexical_density": 0.5172,
+                    "matched_stems": [
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "To outline this general point, I shall take as a case study a family of positions in the literature on trust in AI systems that, on the contrary, specifically rely on attributing a form of expertise to AI systems by comparing certain characteristics of these systems with certain supposedly analogous characteristics of ****human**** experts."
+                },
+                {
+                    "index": 205,
+                    "score": 1.0233,
+                    "lexical_density": 0.5116,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The functioning of expert systems is indeed solely based on a form of ‘mere computation, calculation and memory retrieval’ (p. 8), in contrast to which Alvarado defines the truly ****epistemic**** nature of the most recent AI systems."
+                },
+                {
+                    "index": 54,
+                    "score": 1.0182,
+                    "lexical_density": 0.5091,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Following the categorisation pro posed by Rom Harré (2010) – recently revisited by Eamon Duede (2022) – we can distinguish between physically mediated instruments and theoretically mediated instruments (Duede, 2022) – two types of ****epistemic**** instruments with two types of justifications for the trust placed in them."
+                },
+                {
+                    "index": 18,
+                    "score": 1.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "human"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Finally the third form of opacity Burrell identifies is the unintelligibility to ****humans**** of the mathematical processes involved in an algorithm."
+                },
+                {
+                    "index": 21,
+                    "score": 1.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Opaque systems are furthermore frequently referred to in the literature as ****epistemic**** ‘black boxes’ (London, 2019; Creel, 2020), insofar as it is virtually impossible to verify or obtain any kind of explanation or justification concerning the production of a particular output."
+                }
+            ]
+        },
+        {
+            "name": "moral",
+            "stems": [
+                "action",
+                "causal",
+                "moral",
+                "ration"
+            ],
+            "ngrams": [
+                "action decision",
+                "moral character"
+            ],
+            "excluded_stems": [
+                "machin"
+            ],
+            "excluded_ngrams": [
+                "machine learning"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 390,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [
+                        "action decision"
+                    ],
+                    "sentence": "Given that the opacity of a human expert’s ****actions****, ****decisions****, and judgements usually does not prevent lay people from trusting them, this opacity is sometimes invoked to justify placing a similar level of trust in AI systems."
+                },
+                {
+                    "index": 316,
+                    "score": 1.322,
+                    "lexical_density": 0.4407,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [
+                        "action decision"
+                    ],
+                    "sentence": "The confusion at stake rests on a fraudulent assimilation of causes with reasons in the context of the explanation of ****actions****: where human ****actions**** and ****decisions**** do require to be explained by reasons, the outputs of AI systems can only be explained by causes (or metonymically by the reasons of their designers and/or users)."
+                },
+                {
+                    "index": 288,
+                    "score": 1.32,
+                    "lexical_density": 0.44,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [
+                        "action decision"
+                    ],
+                    "sentence": "As Jonathan Lowe noted (2009, p. 349), the ‘seemingly small step’ of turning the reasons for a person’s ****action**** or ****decision**** into the causes of their ****action**** or ****decision**** is in reality ‘an erroneous [step] of enormous magnitude’."
+                },
+                {
+                    "index": 104,
+                    "score": 0.9811,
+                    "lexical_density": 0.4906,
+                    "matched_stems": [
+                        "ration"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "They write that …\n\nA large part of human-level opacity stems from the fact that human agents are also frequently mistaken about their real (internal) motivations and processing logic, a fact that is often obscured by the ability of human decision makers to invent post hoc ****rationalizations****."
+                },
+                {
+                    "index": 68,
+                    "score": 0.963,
+                    "lexical_density": 0.4815,
+                    "matched_stems": [
+                        "moral"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Trustworthiness is considered to be much more meaningful than mere reliability, and being trustworthy would require the recipient of trust to possess particular ****moral**** characteristics."
+                },
+                {
+                    "index": 103,
+                    "score": 0.8889,
+                    "lexical_density": 0.4444,
+                    "matched_stems": [
+                        "action"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Finally, John Zerilli et al. (2019, p. 666) suggest that explaining human ****actions**** is all the more tricky because the agents themselves are sometimes unaware of their true motivations or what may have played a role in their reasoning."
+                }
+            ]
+        },
+        {
+            "name": "systems",
+            "stems": [
+                "concept",
+                "context",
+                "epistem",
+                "expertis",
+                "system",
+                "use"
+            ],
+            "ngrams": [
+                "artificial system model"
+            ],
+            "excluded_stems": [
+                "way"
+            ],
+            "excluded_ngrams": [
+                "epistemic dependence",
+                "epistemic agent",
+                "expertise reveal",
+                "certain way",
+                "trust artificial system",
+                "trust human expert"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 6,
+                    "score": 2.3214,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "context",
+                        "epistem",
+                        "expertis",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "These matters about trust, dependence and ****expertise**** in the ****context**** of knowledge acquisition, traditional as they are, are nowadays being revisited as our ****epistemic**** world is being redefined by the arrival of what might seem to be new ****epistemic**** agents: artificial ****systems**** apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 37,
+                    "score": 2.2059,
+                    "lexical_density": 0.4412,
+                    "matched_stems": [
+                        "concept",
+                        "expertis",
+                        "system"
+                    ],
+                    "matched_ngrams": [
+                        "artificial system model"
+                    ],
+                    "sentence": "The fourth section of the paper will show the limits of this ****conception**** of ****expertise****, and will argue against conceptualising trust in ****artificial**** ****systems**** on the ****model**** of trust in human experts."
+                },
+                {
+                    "index": 216,
+                    "score": 1.8947,
+                    "lexical_density": 0.4737,
+                    "matched_stems": [
+                        "concept",
+                        "epistem",
+                        "expertis"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The purely veritistic and functionalist ****conception**** of ****expertise****, thus, does not seem to exclude the possibility for artefacts to act as ****epistemic**** experts and hence ****epistemic**** peers, insofar as they provide broadly correct results."
+                },
+                {
+                    "index": 1,
+                    "score": 1.8537,
+                    "lexical_density": 0.4634,
+                    "matched_stems": [
+                        "epistem",
+                        "expertis",
+                        "use"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "An overview of some of the major questions surrounding ****expertise**** further reveals the extent to which this notion of deference hinges on more general relationships of ‘****epistemic**** dependence’, to ****use**** John Hardwig’s (1985) expression."
+                },
+                {
+                    "index": 10,
+                    "score": 1.8333,
+                    "lexical_density": 0.4583,
+                    "matched_stems": [
+                        "context",
+                        "system",
+                        "use"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "****Systems**** involving deep learning are widely ****used**** (to mention only some of the cases most frequently dis cussed in the literature) in the ****context**** of medical diagnosis and imaging (Lee et al., 2017; Grote & Berens, 2020; Bjerring & Busch, 2020), pol icing – within what is sometimes referred to as ‘predictive pol icing’ – (Asaro, 2019; Walsh, 2022), banking, finance and insurance (Narang et al., 2024; Pingili, 2024)."
+                },
+                {
+                    "index": 211,
+                    "score": 1.75,
+                    "lexical_density": 0.5833,
+                    "matched_stems": [
+                        "epistem",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "For example, Jens Christian Bjerring and Jacob Busch (2020, p. 3) state that …\n\ninsofar as AI ****systems**** will eventually outperform the best practitioners in specific medical domains, practitioners will have ****epistemic**** obligation to rely on these ****systems**** in medical decision making."
+                },
+                {
+                    "index": 218,
+                    "score": 1.7027,
+                    "lexical_density": 0.5676,
+                    "matched_stems": [
+                        "concept",
+                        "expertis"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4 Artificial experts versus human experts\n\n4.1 ****Expertise****, comprehension and justification\n\nThe veritistic ****conception****, although it helps bringing to light some of the necessary characteristics of ****expertise****, suffers from a number of limitations."
+                },
+                {
+                    "index": 33,
+                    "score": 1.6452,
+                    "lexical_density": 0.5484,
+                    "matched_stems": [
+                        "epistem",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The second section of the paper will offer a brief reflection on the trust ordinarily placed in ****epistemic**** instruments and the upheaval caused in this respect by current AI ****systems****."
+                },
+                {
+                    "index": 353,
+                    "score": 1.5789,
+                    "lexical_density": 0.5263,
+                    "matched_stems": [
+                        "epistem",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4.5 ****Epistemic**** peers and disagreement\n\nThese remarks about machines’ lack of intellectual character allow us to return to the questions raised earlier: can artificial ****systems**** be experts in the same way that human beings can?"
+                },
+                {
+                    "index": 23,
+                    "score": 1.5714,
+                    "lexical_density": 0.5238,
+                    "matched_stems": [
+                        "system",
+                        "use"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The ****use**** of such ‘opaque’ ****systems**** naturally poses a number of ethical problems, including embarrassing cases of ‘responsibility gaps’ (Coeckelbergh, 2020; Da Silva, 2024) and algorithmic biases (Walsh, 2022;"
+                },
+                {
+                    "index": 81,
+                    "score": 1.5517,
+                    "lexical_density": 0.5172,
+                    "matched_stems": [
+                        "expertis",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "To outline this general point, I shall take as a case study a family of positions in the literature on trust in AI ****systems**** that, on the contrary, specifically rely on attributing a form of ****expertise**** to AI ****systems**** by comparing certain characteristics of these ****systems**** with certain supposedly analogous characteristics of human experts."
+                },
+                {
+                    "index": 0,
+                    "score": 1.5455,
+                    "lexical_density": 0.5152,
+                    "matched_stems": [
+                        "expertis",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "****Expertise****, opacity, and trust in AI ****systems****\n\nÉloïse Boisseau\n\n1 Introduction\n\nThe conjoined issues of the trust placed in experts and the deference shown by non-specialists toward them are well-established topics in social epistemology (Hardwig, 1985, 1991; Lackey, 2018; Goldman, 2001; Rolin, 2002; Whyte & Crease, 2010)."
+                },
+                {
+                    "index": 205,
+                    "score": 1.5349,
+                    "lexical_density": 0.5116,
+                    "matched_stems": [
+                        "epistem",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The functioning of expert ****systems**** is indeed solely based on a form of ‘mere computation, calculation and memory retrieval’ (p. 8), in contrast to which Alvarado defines the truly ****epistemic**** nature of the most recent AI ****systems****."
+                },
+                {
+                    "index": 21,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Opaque ****systems**** are furthermore frequently referred to in the literature as ****epistemic**** ‘black boxes’ (London, 2019; Creel, 2020), insofar as it is virtually impossible to verify or obtain any kind of explanation or justification concerning the production of a particular output."
+                },
+                {
+                    "index": 40,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Therefore, modelling the trust we place in AI ****systems**** on the trust we place in human experts is a misguided (and potentially ****epistemic**** ally dangerous) attitude."
+                },
+                {
+                    "index": 118,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "concept",
+                        "use"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "To take one example, Evan Thompson et al. (2024, p. 169) rightly point out that expert Go players ‘****use**** their finely honed pattern recognition skills, which they cannot verbalize or formulate in terms of explicit ****concepts**** and rules’."
+                },
+                {
+                    "index": 138,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "epistem",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "For our purposes, this variety of opacity pushes the comparison between opaque artificial ****systems**** and human ****epistemic**** agents even further."
+                },
+                {
+                    "index": 155,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "context",
+                        "use"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "She writes that …\n\nif we are interested in developing an approval process that could certify certain opaque AI technology and approve its ****use**** in particular ****contexts**** while all owing the technology to remain opaque, we might make progress on this issue by continuing research into the relevant features of familiar and successful practices of certifying human experts."
+                },
+                {
+                    "index": 174,
+                    "score": 1.4444,
+                    "lexical_density": 0.4815,
+                    "matched_stems": [
+                        "expertis",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "We could indeed very well imagine people being trained to recognise certain characteristics that have been designated upstream as qualifying criteria for ****expertise**** in artificial ****systems****."
+                },
+                {
+                    "index": 162,
+                    "score": 1.3953,
+                    "lexical_density": 0.4651,
+                    "matched_stems": [
+                        "expertis",
+                        "use"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The badge or socially assigned label of ****expertise**** refers, to quote Kyle Powys Whyte and Robert Crease (2010, p. 413), to ‘indicators […] actually ****used**** by others as the basis for trusting scientists’."
+                }
+            ]
+        },
+        {
+            "name": "trust",
+            "stems": [
+                "artefact",
+                "artifici",
+                "follow",
+                "let",
+                "point",
+                "relianc",
+                "sens",
+                "system",
+                "trust"
+            ],
+            "ngrams": [
+                "trust artificial system",
+                "aspect trust",
+                "trust ai system",
+                "expertise opacity trust",
+                "opacity trust ai",
+                "issue trust place"
+            ],
+            "excluded_stems": [],
+            "excluded_ngrams": [
+                "ai system éloïse",
+                "system éloïse boisseau",
+                "conjoin issue trust"
+            ],
+            "most_insightful_sentences": [
+                {
+                    "index": 42,
+                    "score": 3.92,
+                    "lexical_density": 0.56,
+                    "matched_stems": [
+                        "artifici",
+                        "let",
+                        "relianc",
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [
+                        "trust artificial system"
+                    ],
+                    "sentence": "2 ****Trust**** in ****artificial**** ****systems****\n\n2.1 ****Trust**** and ****reliance****\n\n****Let**** us first make a few distinctions regarding this notion of ****trust**** visàvis ****artificial**** ****systems****."
+                },
+                {
+                    "index": 0,
+                    "score": 3.6061,
+                    "lexical_density": 0.5152,
+                    "matched_stems": [
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [
+                        "expertise opacity trust",
+                        "issue trust place",
+                        "opacity trust ai",
+                        "trust ai system"
+                    ],
+                    "sentence": "****Expertise****, ****opacity****, and ****trust**** in ****AI**** ****systems****\n\nÉloïse Boisseau\n\n1 Introduction\n\nThe conjoined ****issues**** of the ****trust**** ****placed**** in experts and the deference shown by non-specialists toward them are well-established topics in social epistemology (Hardwig, 1985, 1991; Lackey, 2018; Goldman, 2001; Rolin, 2002; Whyte & Crease, 2010)."
+                },
+                {
+                    "index": 81,
+                    "score": 2.5862,
+                    "lexical_density": 0.5172,
+                    "matched_stems": [
+                        "point",
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [
+                        "trust ai system"
+                    ],
+                    "sentence": "To outline this general ****point****, I shall take as a case study a family of positions in the literature on ****trust**** in ****AI**** ****systems**** that, on the contrary, specifically rely on attributing a form of expertise to AI ****systems**** by comparing certain characteristics of these ****systems**** with certain supposedly analogous characteristics of human experts."
+                },
+                {
+                    "index": 37,
+                    "score": 2.2059,
+                    "lexical_density": 0.4412,
+                    "matched_stems": [
+                        "artifici",
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [
+                        "trust artificial system"
+                    ],
+                    "sentence": "The fourth section of the paper will show the limits of this conception of expertise, and will argue against conceptualising ****trust**** in ****artificial**** ****systems**** on the model of ****trust**** in human experts."
+                },
+                {
+                    "index": 390,
+                    "score": 2.0,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [
+                        "trust ai system"
+                    ],
+                    "sentence": "Given that the opacity of a human expert’s actions, decisions, and judgements usually does not prevent lay people from ****trusting**** them, this opacity is sometimes invoked to justify placing a similar level of ****trust**** in ****AI**** ****systems****."
+                },
+                {
+                    "index": 6,
+                    "score": 1.8571,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "artifici",
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "These matters about ****trust****, dependence and expertise in the context of knowledge acquisition, traditional as they are, are nowadays being revisited as our epistemic world is being redefined by the arrival of what might seem to be new epistemic agents: ****artificial**** ****systems**** apparently endowed with entirely new cognitive-like capabilities."
+                },
+                {
+                    "index": 152,
+                    "score": 1.7931,
+                    "lexical_density": 0.4483,
+                    "matched_stems": [
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [
+                        "trust ai system"
+                    ],
+                    "sentence": "It is relevant because it is sometimes presented as a tempting solution to partially resolve the issue of ****trust**** in ****AI**** ****systems**** in relation to their blackbox nature."
+                },
+                {
+                    "index": 388,
+                    "score": 1.76,
+                    "lexical_density": 0.44,
+                    "matched_stems": [
+                        "artifici",
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "5 Conclusion\nMy aim in this paper was to assess how far the analogy holds between the ****trust**** a layperson places in an expert and the ****trust**** – whether from a layperson or an expert – that a human being places in a deep learning-based ****artificial**** ****system****."
+                },
+                {
+                    "index": 33,
+                    "score": 1.6452,
+                    "lexical_density": 0.5484,
+                    "matched_stems": [
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The second section of the paper will offer a brief reflection on the ****trust**** ordinarily placed in epistemic instruments and the upheaval caused in this respect by current AI ****systems****."
+                },
+                {
+                    "index": 353,
+                    "score": 1.5789,
+                    "lexical_density": 0.5263,
+                    "matched_stems": [
+                        "artifici",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "4.5 Epistemic peers and disagreement\n\nThese remarks about machines’ lack of intellectual character allow us to return to the questions raised earlier: can ****artificial**** ****systems**** be experts in the same way that human beings can?"
+                },
+                {
+                    "index": 54,
+                    "score": 1.5273,
+                    "lexical_density": 0.5091,
+                    "matched_stems": [
+                        "follow",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "****Following**** the categorisation pro posed by Rom Harré (2010) – recently revisited by Eamon Duede (2022) – we can distinguish between physically mediated instruments and theoretically mediated instruments (Duede, 2022) – two types of epistemic instruments with two types of justifications for the ****trust**** placed in them."
+                },
+                {
+                    "index": 40,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Therefore, modelling the ****trust**** we place in AI ****systems**** on the ****trust**** we place in human experts is a misguided (and potentially epistemic ally dangerous) attitude."
+                },
+                {
+                    "index": 138,
+                    "score": 1.5,
+                    "lexical_density": 0.5,
+                    "matched_stems": [
+                        "artifici",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "For our purposes, this variety of opacity pushes the comparison between opaque ****artificial**** ****systems**** and human epistemic agents even further."
+                },
+                {
+                    "index": 62,
+                    "score": 1.4595,
+                    "lexical_density": 0.4865,
+                    "matched_stems": [
+                        "relianc",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "The ****trust**** that users place in their GPS (their ****reliance**** on its proper functioning) is then understood as what Mark Coeckelbergh (2012, p. 55) ultimately describes as a merely predictive ****trust****."
+                },
+                {
+                    "index": 30,
+                    "score": 1.4545,
+                    "lexical_density": 0.4848,
+                    "matched_stems": [
+                        "artifici",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "According to these views, the AI ****system**** would then be considered a bona fide new expert, no longer human but ****artificial**** in nature (Grote & Berens, 2020)."
+                },
+                {
+                    "index": 35,
+                    "score": 1.4545,
+                    "lexical_density": 0.4848,
+                    "matched_stems": [
+                        "artifici",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "We shall see that this conceptualisation is based on the much dis cussed but ambiguous notion of opacity (which in fact crystallises many debates surrounding ****artificial**** decision-making ****systems****)."
+                },
+                {
+                    "index": 174,
+                    "score": 1.4444,
+                    "lexical_density": 0.4815,
+                    "matched_stems": [
+                        "artifici",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "We could indeed very well imagine people being trained to recognise certain characteristics that have been designated upstream as qualifying criteria for expertise in ****artificial**** ****systems****."
+                },
+                {
+                    "index": 26,
+                    "score": 1.4286,
+                    "lexical_density": 0.4762,
+                    "matched_stems": [
+                        "system",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "A somewhat recurrent hypothesis in the literature – sometimes stated explicitly, other times implicitly or underlyingly – is that the ****trust**** placed in these opaque ****systems**** should be modelled on the type of ****trust**** we ordinarily place in human experts."
+                },
+                {
+                    "index": 82,
+                    "score": 1.4,
+                    "lexical_density": 0.4667,
+                    "matched_stems": [
+                        "let",
+                        "trust"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "3 Blind ****trust**** and expertise\n\n3.1 ****Let**** us meet in the dark\n\nWe have already noted that there is a constitutive form of (partial) blindness in ****trust****."
+                },
+                {
+                    "index": 373,
+                    "score": 1.3929,
+                    "lexical_density": 0.4643,
+                    "matched_stems": [
+                        "sens",
+                        "system"
+                    ],
+                    "matched_ngrams": [],
+                    "sentence": "Considering a decision support ****system**** as an expert can lead human experts to grant too great a form of agency to the machine, insofar as the latter is in no way competent in the ****sense**** that interests us when we speak of expertise – i.e. a ****sense**** that goes beyond the simple veritistic framework."
+                }
+            ]
+        }
+    ]
+}

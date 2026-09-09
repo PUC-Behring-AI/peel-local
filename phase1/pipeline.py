@@ -31,6 +31,44 @@ POS_MAP = {
 
 DEFAULT_GLOSSBERT_MODEL = "jvomiranda/GlossBERT_Checkpoint"
 
+# One prompt per Phase 1 config parameter, shared by all three interfaces
+# (CLI, notebook, webapp) via log_phase1_config below -- so the exact same
+# wording is logged regardless of which interface produced the run,
+# instead of three independently-drifting copies of the same text.
+PHASE1_CONFIG_PROMPTS = {
+    "frequency_percentile": "Percentile cutoff on the frequency-ranked stem vocabulary",
+    "max_stems": "Maximum number of stems to return",
+    "word_frequency_percentile": "Percentile cutoff on each stem's own derived-word frequency ranking",
+    "max_sentences_per_stem": "Sentences sampled per stem for WSD scoring",
+    "max_synsets": "Ceiling on WordNet senses considered per word",
+    "merge_duplicate_word_occurrences": "Merge all occurrences of the same word before WSD scoring?",
+    "max_cluster_size": "Cluster size above which it gets automatically re-split",
+    "min_clusters": "HDBSCAN min_cluster_size for the initial clustering pass",
+    "min_cluster_len": "Minimum stems for a rerun/noise cluster to be kept valid",
+    "glossbert_model": "GlossBERT model checkpoint to load",
+    "lang_model": "spaCy language model to load",
+    "sentence_embedder": "Sentence-BERT model for stem embeddings",
+}
+
+
+def log_phase1_config(decisions, config: dict, source: str) -> None:
+    """Logs every already-resolved Phase 1 config value as its own
+    decision under step="phase1_setup" (one entry per parameter, matching
+    the pre-existing merge_duplicate_words_choice/
+    word_frequency_percentile_choice convention) -- so the full
+    configuration a run actually used is reconstructable from the
+    decision log alone, not just the interactive review choices made
+    afterward. `config` keys must be a subset of PHASE1_CONFIG_PROMPTS;
+    call once per interface with that interface's own resolved values
+    (frequency_percentile/max_stems should already reflect the sweep's
+    pick, if the sweep ran)."""
+    for name, value in config.items():
+        decisions.record(
+            step="phase1_setup", decision_type=f"{name}_choice",
+            prompt=PHASE1_CONFIG_PROMPTS[name], choice=str(value),
+            extra={"source": source},
+        )
+
 TABLEAU20 = [
     "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
     "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
@@ -53,6 +91,95 @@ def load_glossbert(model_id: str = DEFAULT_GLOSSBERT_MODEL, device="cpu"):
     return tokenizer, model
 
 
+# GlossBERT's tokenizer call uses max_length=128 for the (sentence, gloss)
+# pair. Left as-is, HF's default pair-truncation strategy trims from the
+# END of whichever sequence is longer -- for a long sentence, that means
+# the tail gets cut regardless of where the marked target word actually
+# sits, silently dropping it (and its quote-marking) from GlossBERT's
+# input entirely whenever it occurs late in a long sentence. Verified on
+# real corpus data (see docs/ai_prompts_catalog.md): in one 114-word
+# Boisseau sentence, 2 of 4 flagged words were judged with zero local
+# context because of exactly this.
+#
+# Fix: instead of feeding the whole sentence, feed a WORD-WINDOW centered
+# on the target word, sized so it's guaranteed to fit within max_length
+# alongside the gloss -- regardless of where in the original sentence the
+# word sits. For a sentence already short enough to fit whole, the window
+# request is >= the sentence's own length, so this is a no-op (byte-
+# identical to the old behavior) for the common case; it only changes
+# anything for the sentences that were silently losing the word before.
+_GLOSSBERT_MAX_LENGTH = 128
+# glossbert_predict_merged concatenates multiple occurrences into one
+# paragraph before scoring, so it gets a much larger budget than a single
+# occurrence needs -- GlossBERT is BERT-base underneath (max_position_
+# embeddings=512), so 512 is the model's actual ceiling, not an arbitrary
+# increase. Single-occurrence glossbert_predict deliberately stays at 128:
+# one sentence window rarely needs more, and keeping it small keeps that
+# path's latency down since it runs once per occurrence rather than once
+# per merged group.
+_GLOSSBERT_MERGED_MAX_LENGTH = 512
+_GLOSSBERT_SPECIAL_TOKENS = 3            # [CLS] + [SEP] + [SEP]
+_GLOSSBERT_QUOTE_TOKENS_PER_MARK = 2     # the two literal '"' characters around one marked word
+_GLOSSBERT_TOKENS_PER_WORD = 1.6         # measured p95 (not mean 1.3) tokens/word on real corpus
+                                           # text with this tokenizer -- deliberately pessimistic
+                                           # so the WORD-based window still fits after wordpiece
+                                           # subword splitting, not just on average
+
+
+def _glossbert_words_budget(gloss, tokenizer, n_marks=1, min_words_each_side=1, max_length=_GLOSSBERT_MAX_LENGTH):
+    """How many words of surrounding context (each side, per marked
+    occurrence) fit in `max_length` once `gloss` and n_marks sets of
+    quote-marking are accounted for. n_marks=1 for a single occurrence;
+    >1 when glossbert_predict_merged shares one budget (max_length=512,
+    see _GLOSSBERT_MERGED_MAX_LENGTH) across several concatenated
+    occurrences."""
+    # truncation=True/max_length here is purely defensive -- a WordNet
+    # gloss is always short, this measurement realistically never gets
+    # anywhere near max_length -- but it silences transformers' "token
+    # indices sequence length" warning for the (currently theoretical)
+    # case of an unusually long gloss, with no effect on the result: a
+    # measurement this method would ever act on is already far below
+    # max_length, so capping it there loses no decision-relevant
+    # precision (mirrors the identical, non-theoretical fix in
+    # _fit_contexts_to_budget's n_tokens(), which real Boisseau sentences
+    # DO trigger).
+    gloss_tokens = len(tokenizer(gloss, truncation=True, max_length=max_length)["input_ids"]) - 2
+    quote_tokens = _GLOSSBERT_QUOTE_TOKENS_PER_MARK * n_marks
+    budget = max_length - _GLOSSBERT_SPECIAL_TOKENS - quote_tokens - gloss_tokens
+    budget = max(budget, min_words_each_side * 2 * n_marks)
+    per_mark_budget = budget / n_marks
+    return max(min_words_each_side, int(per_mark_budget / _GLOSSBERT_TOKENS_PER_WORD / 2))
+
+
+def _window_around_match(sentence, match_start, match_end, max_words_each_side):
+    """Word-based window around sentence[match_start:match_end], extended
+    up to max_words_each_side words on each side (clamped at sentence
+    boundaries; '...' marks an actual cut).
+
+    Strips literal straight double-quotes (") from the window text before
+    the caller wraps the matched word in its own pair of them -- GlossBERT
+    (per its paper) uses "..." as the ONLY signal for which word is being
+    disambiguated, so if the surrounding context already contains a
+    straight-quote pair (a direct quotation, scare-quotes, code-like
+    text), the model would see multiple indistinguishable quote-marked
+    spans with no way to tell which one is the real target. Verified this
+    doesn't currently affect Boisseau (0 literal straight quotes in that
+    corpus; it uses typographic curly quotes exclusively, which tokenize
+    to entirely different token ids than the marking character -- no
+    collision), but a different corpus could easily contain them.
+    Replaced with a space, not deleted outright, so two words separated
+    only by a quote don't get accidentally fused together."""
+    before_words = sentence[:match_start].replace('"', " ").split()
+    after_words = sentence[match_end:].replace('"', " ").split()
+
+    kept_before = before_words[-max_words_each_side:] if max_words_each_side else []
+    kept_after = after_words[:max_words_each_side] if max_words_each_side else []
+
+    prefix = "... " if len(kept_before) < len(before_words) else ""
+    suffix = " ..." if len(kept_after) < len(after_words) else ""
+    return prefix + " ".join(kept_before), " ".join(kept_after) + suffix
+
+
 def glossbert_predict(occurrence, tokenizer, model, device, pos_map=POS_MAP, max_synsets=5):
     word = occurrence["word"]
     pos = occurrence["pos"]
@@ -67,11 +194,26 @@ def glossbert_predict(occurrence, tokenizer, model, device, pos_map=POS_MAP, max
     # Case-insensitive: word is normalized lowercase (see map_stems_to_sentences),
     # but sentence keeps its original casing (e.g. an all-caps heading) --
     # a case-sensitive .replace() would silently fail to find the word there.
-    match = re.search(re.escape(word), sentence, re.IGNORECASE)
-    marked_sentence = (
-        f'{sentence[:match.start()]} "{match.group()}" {sentence[match.end():]}'
-        if match else sentence
-    )
+    # \b-anchored: without word boundaries, a short word like "ai" matches
+    # the substring inside "main"/"again"/"certain"/"maintain" etc. --
+    # re.search returns the FIRST such match in the sentence, so a stem
+    # whose letters happen to occur inside an earlier, unrelated word gets
+    # windowed and marked around that unrelated word instead of its real
+    # target. Verified on real Boisseau data: "ai" was being marked inside
+    # "main" while the real "AI" later in the same sentence was ignored.
+    match = re.search(r"\b" + re.escape(word) + r"\b", sentence, re.IGNORECASE)
+    if match:
+        # Sized once, using the LONGEST candidate gloss, so every synset
+        # below is scored against the identical sentence window -- only
+        # the gloss differs, keeping the cross-sense comparison fair
+        # (a synset with a longer gloss doesn't get a smaller window than
+        # its competitors).
+        worst_case_gloss = max((syn.definition() for syn in synsets), key=len)
+        max_words_each_side = _glossbert_words_budget(worst_case_gloss, tokenizer)
+        before, after = _window_around_match(sentence, match.start(), match.end(), max_words_each_side)
+        marked_sentence = f'{before} "{match.group()}" {after}'.strip()
+    else:
+        marked_sentence = sentence
 
     results = []
     for syn in synsets:
@@ -95,11 +237,95 @@ def glossbert_predict(occurrence, tokenizer, model, device, pos_map=POS_MAP, max
     return results
 
 
+def glossbert_predict_merged(word, occurrences, tokenizer, model, device, pos_map=POS_MAP, max_synsets=5):
+    """Merges every occurrence's sentence (each independently marked around
+    its own instance of `word` before merging, so this doesn't inherit
+    glossbert_predict's "only the first regex match" limitation) into one
+    paragraph and scores it against WordNet candidate synsets exactly
+    once -- used when merge_duplicate_word_occurrences is enabled, so a
+    word occurring multiple times in the sampled window yields at most
+    one prediction instead of one per occurrence (see
+    run_glossbert_analysis).
+
+    Uses a 512-token budget (_GLOSSBERT_MERGED_MAX_LENGTH) rather than
+    glossbert_predict's 128 -- GlossBERT is BERT-base underneath, so 512 is
+    its actual position-embedding ceiling, and a merged paragraph has much
+    more text to fit than a single occurrence does. The merge window is
+    bounded by max_sentences_per_stem, not a separate uncapped setting.
+    Each occurrence's own sentence is windowed around its match the same
+    way glossbert_predict windows a single occurrence (see
+    _window_around_match), with the shared 512-token budget split N ways
+    across all occurrences being merged -- so every occurrence keeps at
+    least some surrounding context and its quote-marking, rather than
+    later occurrences in the join order being silently dropped by tail-
+    truncation once the paragraph runs long."""
+    pos = occurrences[0]["pos"]
+    wn_pos = pos_map.get(pos)
+
+    synsets = wn.synsets(word, pos=wn_pos)
+    if not synsets:
+        return None
+    synsets = synsets[:max_synsets]
+
+    worst_case_gloss = max((syn.definition() for syn in synsets), key=len)
+    max_words_each_side = _glossbert_words_budget(
+        worst_case_gloss, tokenizer, n_marks=len(occurrences), max_length=_GLOSSBERT_MERGED_MAX_LENGTH,
+    )
+
+    marked_sentences = []
+    for occurrence in occurrences:
+        sentence = occurrence["sentence"]
+        # \b-anchored -- see glossbert_predict's identical fix for why an
+        # unanchored substring search can mark the wrong word entirely.
+        match = re.search(r"\b" + re.escape(word) + r"\b", sentence, re.IGNORECASE)
+        if match:
+            before, after = _window_around_match(sentence, match.start(), match.end(), max_words_each_side)
+            marked_sentences.append(f'{before} "{match.group()}" {after}'.strip())
+        else:
+            marked_sentences.append(sentence)
+    merged_text = " ".join(marked_sentences)
+
+    results = []
+    for syn in synsets:
+        gloss = syn.definition()
+        encoding = tokenizer(
+            merged_text, gloss,
+            return_tensors="pt", truncation=True,
+            max_length=_GLOSSBERT_MERGED_MAX_LENGTH, padding="max_length",
+        )
+        input_ids = encoding["input_ids"].to(device)
+        attention_mask = encoding["attention_mask"].to(device)
+
+        with torch.no_grad():
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            probs = torch.softmax(outputs.logits, dim=1)
+            match_score = probs[0][1].item()
+
+        results.append({"synset": syn, "definition": gloss, "score": match_score})
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
+
+
 # ============================================================
 # STEM EXTRACTION & MAPPING
 # ============================================================
 
-def extract_top_stems(doc, stemmer, top_percentile, max_stems) -> dict:
+def extract_top_stems(doc, stemmer, frequency_percentile, max_stems) -> dict:
+    """`frequency_percentile` is a statistical percentile CUTOFF on the
+    stem-frequency ranking (0-1): only stems at or above that percentile
+    of the ranking are kept, so a HIGHER value is a stricter bar and
+    selects FEWER (the most frequent) stems -- e.g. 0.75 keeps only the
+    top 25% most-frequent stems, matching the everyday sense of "90th
+    percentile cutoff" meaning "top 10%". Internally this is
+    `kept_fraction = 1 - frequency_percentile` of the ranked vocabulary,
+    since the true value-based percentile of raw frequency counts
+    degenerates on real (Zipfian) text -- e.g. on Boisseau, 43.6% of
+    stems occur exactly once, so the 25th percentile of frequency VALUES
+    is already 1, and "keep everything >= 1" selects 100% of the
+    vocabulary instead of 75%. Rank-based selection sidesteps that tie
+    pileup and gives a predictable stem count regardless of how skewed
+    the frequency distribution is."""
     tokens = [
         stemmer.stem(token.text.lower())
         for token in doc
@@ -107,8 +333,35 @@ def extract_top_stems(doc, stemmer, top_percentile, max_stems) -> dict:
     ]
 
     sorted_freq = sorted(Counter(tokens).items(), key=lambda x: x[1], reverse=True)
-    final_n = min(math.ceil(len(sorted_freq) * top_percentile), max_stems)
+    kept_fraction = 1 - frequency_percentile
+    final_n = min(math.ceil(len(sorted_freq) * kept_fraction), max_stems)
     return dict(sorted_freq[:final_n])
+
+
+def describe_stem_cap(top_stems, doc, stemmer, frequency_percentile, max_stems) -> str | None:
+    """One-line note for when max_stems -- not frequency_percentile --
+    actually determined the final stem count, since a LOWER
+    frequency_percentile keeps a LARGER fraction of the ranked vocabulary
+    (it's easy to pick a low frequency_percentile, still exceed
+    max_stems, and be surprised the count didn't grow further). Returns
+    None when the cap didn't bind (frequency_percentile alone already
+    produced <= max_stems)."""
+    if len(top_stems) < max_stems:
+        return None
+    vocab_size = len({
+        stemmer.stem(token.text.lower())
+        for token in doc
+        if not token.is_stop and not token.is_punct and not token.is_space and token.is_alpha
+    })
+    kept_fraction = 1 - frequency_percentile
+    uncapped = math.ceil(vocab_size * kept_fraction)
+    if uncapped <= max_stems:
+        return None
+    return (
+        f"(frequency_percentile={frequency_percentile} alone would select {uncapped} stems "
+        f"from this corpus's {vocab_size}-stem vocabulary -- max_stems={max_stems} "
+        "capped it; a lower frequency_percentile would not have selected fewer)"
+    )
 
 
 def map_stems_to_sentences(doc, top_stems, stemmer) -> dict:
@@ -137,6 +390,45 @@ def map_stems_to_sentences(doc, top_stems, stemmer) -> dict:
     return stem_occurrences
 
 
+def filter_stem_occurrences_by_word_frequency(stem_occurrences, word_frequency_percentile, min_words_per_stem=1) -> dict:
+    """Trims each stem's DERIVED WORDS (distinct surface forms, e.g.
+    "observation"/"observes"/"observed" all stemming to "observ") down to
+    only those at or above a percentile cutoff of THAT STEM'S OWN
+    word-frequency ranking -- same rank-based percentile-cutoff semantics
+    as extract_top_stems's frequency_percentile (higher = fewer, more
+    frequent kept), just applied one level down: from stems to the words
+    derived from each stem, instead of pooling every stem's words into one
+    global ranking (which would let a single low-frequency stem lose ALL
+    of its words while a high-frequency stem barely loses any).
+
+    Run this right after map_stems_to_sentences and before
+    run_glossbert_analysis: run_glossbert_analysis's own
+    max_sentences_per_stem cap samples occurrences in raw DOCUMENT ORDER,
+    not by word frequency, so without this filter which derived words
+    even get a chance to be sampled (and therefore reviewed) is
+    essentially arbitrary. This filter makes that pool frequency-driven
+    first, concentrating GlossBERT scoring and manual review on each
+    stem's genuinely representative forms.
+
+    min_words_per_stem guarantees every stem keeps at least its N
+    most-frequent derived words, so a stem is never emptied out entirely
+    by the cutoff. word_frequency_percentile=0 (the default in every
+    interface) keeps every derived word -- byte-identical to no
+    filtering."""
+    if word_frequency_percentile <= 0:
+        return stem_occurrences
+
+    kept_fraction = 1 - word_frequency_percentile
+    filtered = {}
+    for stem, occurrences in stem_occurrences.items():
+        word_counts = Counter(occ["word"] for occ in occurrences)
+        ranked_words = [w for w, _ in sorted(word_counts.items(), key=lambda x: x[1], reverse=True)]
+        n_keep = max(min_words_per_stem, math.ceil(len(ranked_words) * kept_fraction))
+        kept_words = set(ranked_words[:n_keep])
+        filtered[stem] = [occ for occ in occurrences if occ["word"] in kept_words]
+    return filtered
+
+
 # ============================================================
 # GLOSSBERT ANALYSIS
 # ============================================================
@@ -151,14 +443,147 @@ def record_accepted_instance(accepted_definitions, stem, word, pos, definition, 
     return entry
 
 
+def purge_word_from_occurrences(stem_occurrences, stem, word):
+    """Removes every occurrence of `word` from stem_occurrences[stem] in
+    place. Used when a flagged word is deleted from review: skipping
+    record_accepted_instance alone keeps it out of embeddings/clustering
+    (which only read accepted_definitions), but stem_occurrences itself is
+    reused, unfiltered, later by cluster naming (build_stem_word_frequency_table)
+    and by any large-cluster/noise resplit that pulls fresh context text
+    straight from it (recluster_large_clusters, recluster_noise) -- without
+    this purge a deleted word's text could silently resurface there."""
+    if stem not in stem_occurrences:
+        return
+    stem_occurrences[stem] = [occ for occ in stem_occurrences[stem] if occ["word"] != word]
+
+
+def describe_wordnet_excluded_stems(stem_occurrences, max_sentences_per_stem=5,
+                                     merge_duplicate_word_occurrences=False, pos_map=POS_MAP) -> str | None:
+    """One-line note listing every selected stem that run_glossbert_analysis
+    will silently drop before flagged-term review ever sees it: its own
+    `if not synsets: continue` skip, replicated here read-only, for every
+    word in the same capped `occurrences[:max_sentences_per_stem]` sample it
+    actually scores. If that leaves zero WordNet-eligible words the stem
+    produces no flagged item and no accepted instance, so it just
+    disappears between "Selected N top stems" and the final embedded count
+    with no other trace anywhere in the pipeline's output.
+
+    Must mirror run_glossbert_analysis's merged-vs-non-merged branch
+    exactly, not just check "does any occurrence's word have synsets" --
+    they differ in a way that changes the answer:
+      - merge_duplicate_word_occurrences=True: WordNet POS for a word is
+        taken from only its FIRST sampled occurrence
+        (`word_occurrences[0]["pos"]`) -- a later occurrence of the same
+        word tagged with a different, synset-having POS is never consulted.
+      - False (default): each occurrence is checked under its own POS
+        individually, so the same word can be eligible via one occurrence
+        even if another occurrence of it isn't.
+    Confirmed against a real run: with merge=True, `defer`/`et`/`non`/
+    `veritist` all lose their only sampled word to this skip (e.g. `defer`'s
+    first sampled occurrence is tagged NOUN, 0 synsets, even though later
+    occurrences beyond the cap are tagged VERB with 2) while `ross` is
+    correctly left out here since it has real synsets and was a genuine
+    flagged-then-deleted case, not a silent one.
+
+    Returns None when every selected stem has at least one WordNet-eligible
+    word this way."""
+    excluded = []
+    for stem, all_occurrences in stem_occurrences.items():
+        occurrences = all_occurrences[:max_sentences_per_stem]
+        if not occurrences:
+            continue
+
+        if merge_duplicate_word_occurrences:
+            by_word = {}
+            for occurrence in occurrences:
+                by_word.setdefault(occurrence["word"], []).append(occurrence)
+            has_eligible_word = any(
+                wn.synsets(word, pos=pos_map.get(word_occurrences[0]["pos"]))
+                for word, word_occurrences in by_word.items()
+            )
+        else:
+            has_eligible_word = any(
+                wn.synsets(occurrence["word"], pos=pos_map.get(occurrence["pos"]))
+                for occurrence in occurrences
+            )
+
+        if not has_eligible_word:
+            excluded.append(stem)
+
+    if not excluded:
+        return None
+    return (
+        f"NOTE: {len(excluded)} selected stem(s) have no WordNet-eligible derived words and "
+        f"will be silently excluded from flagged-term review and embeddings: {', '.join(sorted(excluded))}"
+    )
+
+
 def run_glossbert_analysis(top_stems, stem_occurrences, tokenizer, model, device,
-                            pos_map=POS_MAP, max_sentences_per_stem=5, max_synsets=5):
+                            pos_map=POS_MAP, max_sentences_per_stem=5, max_synsets=5,
+                            merge_duplicate_word_occurrences=False):
     accepted_definitions = {}
     flagged_words = []
 
     for stem, count in tqdm(top_stems.items(), total=len(top_stems), desc="GlossBERT"):
         occurrences = stem_occurrences.get(stem, [])[:max_sentences_per_stem]
         if not occurrences:
+            continue
+
+        if merge_duplicate_word_occurrences:
+            # Group the (already-capped) sampled occurrences by exact word
+            # text, so each distinct lexical word is scored exactly once
+            # against its concatenated contexts instead of once per
+            # occurrence -- this is what collapses what would otherwise be
+            # multiple, potentially differently-mismatched, independent
+            # predictions for the same word into a single review item.
+            by_word = {}
+            for occurrence in occurrences:
+                by_word.setdefault(occurrence["word"], []).append(occurrence)
+
+            mismatch_found = False
+            word_results = {}
+            for word, word_occurrences in by_word.items():
+                wn_pos = pos_map.get(word_occurrences[0]["pos"])
+                synsets = wn.synsets(word, pos=wn_pos)
+                if not synsets:
+                    continue
+                default_sense = synsets[0]
+
+                results = glossbert_predict_merged(
+                    word, word_occurrences, tokenizer, model, device, pos_map, max_synsets
+                )
+                if results is None:
+                    continue
+                best_sense = results[0]["synset"]
+                word_results[word] = default_sense
+
+                if best_sense.name() != default_sense.name():
+                    mismatch_found = True
+                    flagged_words.append({
+                        "word": word,
+                        "stem": stem,
+                        "pos": word_occurrences[0]["pos"],
+                        "count": count,
+                        "sentence": " ".join(o["sentence"] for o in word_occurrences),
+                        "default_sense": default_sense.name(),
+                        "default_definition": default_sense.definition(),
+                        "predicted_sense": best_sense.name(),
+                        "predicted_definition": best_sense.definition(),
+                        "top_candidates": [
+                            {"sense": r["synset"].name(), "definition": r["definition"], "score": round(r["score"], 4)}
+                            for r in results[:max_synsets]
+                        ],
+                    })
+
+            if not mismatch_found:
+                for occurrence in occurrences:
+                    default_sense = word_results.get(occurrence["word"])
+                    if default_sense is None:
+                        continue
+                    record_accepted_instance(
+                        accepted_definitions, stem, occurrence["word"], occurrence["pos"],
+                        default_sense.definition(), occurrence["sentence"], count,
+                    )
             continue
 
         mismatch_found = False
@@ -221,7 +646,8 @@ def resolve_flagged_choice(item, choice):
     """Pure resolution of a flagged-term review choice; no input() here.
     Returns (kind, value): kind is "definition" (value=chosen text),
     "manual" (caller must still prompt for the custom text),
-    "accept_all", "exit", or "invalid".
+    "accept_all", "exit", "delete" (remove the word from all following
+    steps), or "invalid".
 
     Candidate slots are 1..len(top_candidates); the manual-entry slot is
     whatever number comes right after the last candidate -- both derived
@@ -232,6 +658,8 @@ def resolve_flagged_choice(item, choice):
         return "accept_all", None
     if choice.lower() == "exit":
         return "exit", None
+    if choice.lower() == "delete":
+        return "delete", None
     if choice == "0":
         return "definition", item["default_definition"]
     candidates = item["top_candidates"]
@@ -290,13 +718,17 @@ def print_flagged_words(flagged_words):
         print_flagged_item(item)
 
 
-def run_flagged_term_review(flagged_words, accepted_definitions, decisions):
+def run_flagged_term_review(flagged_words, accepted_definitions, decisions, stem_occurrences=None):
     """Interactive review of GlossBERT's flagged sense mismatches: accept
     all predictions, review one by one, or select specific terms. Mutates
     accepted_definitions in place. Every choice is appended to the
     decisions log via `decisions.record(...)` for later audit -- it does
     not change the interactive flow. Shared by phase1.ipynb and
-    run_pipeline.py so there's one implementation, not two."""
+    run_pipeline.py so there's one implementation, not two.
+
+    stem_occurrences, if given, lets a per-item "delete" choice also purge
+    the word from the raw occurrence pool (not just skip accepting it) --
+    see purge_word_from_occurrences."""
     print("\n===================================")
     print("FLAGGED TERM REVIEW")
     print("===================================\n")
@@ -345,6 +777,7 @@ def run_flagged_term_review(flagged_words, accepted_definitions, decisions):
         print("\n[0] Keep default definition")
         print(f"[{len(item['top_candidates']) + 1}] Enter manual definition")
         print("Or type 'Accept all' to accept all remaining flagged terms")
+        print("Or type 'Delete' to remove this word from all following steps")
 
         choice = input("\nChoice: ").strip()
 
@@ -370,6 +803,12 @@ def run_flagged_term_review(flagged_words, accepted_definitions, decisions):
 
         if kind == "invalid":
             print("\nInvalid option.")
+            return None
+
+        if kind == "delete":
+            if stem_occurrences is not None:
+                purge_word_from_occurrences(stem_occurrences, item["stem"], item["word"])
+            print("\nWord deleted from all following steps.")
             return None
 
         record_accepted_instance(
@@ -430,6 +869,96 @@ def run_flagged_term_review(flagged_words, accepted_definitions, decisions):
 # SEMANTIC CLUSTERING
 # ============================================================
 
+# Every embedding text built below follows a template combining a short
+# label (stem or word), an "Observed words"/context section, and a
+# "Candidate senses" section, fed to all-MiniLM-L6-v2 (max_seq_length=256,
+# measured directly -- not the commonly-assumed 128). "Contexts" is the
+# one section whose length was previously unbounded (up to 3 full source
+# sentences, verbatim, however long); on real Boisseau data this alone
+# was enough to push 2 of the 3 longest stem-texts over 256 tokens,
+# silently truncating away part or all of "Candidate senses" -- the
+# section that comes last in the string and is therefore always what
+# gets cut first. See docs/ai_prompts_catalog.md for the measured cases.
+#
+# Fix: rather than a fixed word-count cap derived from one corpus's
+# measured statistics (which would misfit a source with different
+# vocabulary -- longer compound words, denser subword-splitting, a
+# non-English source, a field whose WordNet-adjacent gloss text runs
+# long, etc.), _fit_contexts_to_budget measures the ACTUAL token cost of
+# every other section of THIS text with the real tokenizer at call time,
+# and gives the context sentences whatever budget is left out of
+# max_seq_length. Each context sentence is then capped using its OWN
+# real tokens-per-word ratio (also measured on the spot), not a
+# corpus-wide assumed ratio -- so the cap adapts automatically to
+# whatever the current source's actual tokenization looks like, and
+# candidate senses (the section most worth protecting, since it's WSD's
+# actual output) is never the one silently sacrificed.
+_SBERT_SPECIAL_TOKENS = 2  # [CLS] + [SEP] around one single (non-pair) input
+
+
+def _fit_contexts_to_budget(tokenizer, max_seq_length, fixed_parts, contexts, min_words_per_context=3):
+    """Caps `contexts` (a list of sentences) so that, combined with every
+    other literal chunk of the template (`fixed_parts` -- labels,
+    observed words, candidate senses, punctuation), the whole text's real
+    token count fits within max_seq_length. All measurements come from
+    tokenizing the actual text being built, right now -- nothing here is
+    a constant borrowed from a different corpus. A no-op when everything
+    already fits."""
+    # truncation=True/max_length here is purely defensive -- this measures
+    # a RAW, not-yet-trimmed context sentence's real length, purely to
+    # decide how much to cut. Verified on real Boisseau data: a long
+    # academic sentence can genuinely be 295+ tokens on its own, which
+    # without this would print transformers' harmless-but-alarming-sounding
+    # "Token indices sequence length is longer than..." warning on every
+    # such sentence -- cosmetic only (the actual embedder.encode() calls
+    # this feeds into never see anything over max_seq_length regardless,
+    # verified directly: 0 of 131 real stem-embedding texts and 0 of the
+    # real recluster_noise texts exceeded 256 tokens on this exact
+    # corpus/config). Capping the MEASUREMENT at max_seq_length changes
+    # nothing decision-relevant: it's only ever compared against a
+    # per-sentence `share` that's always far smaller than max_seq_length
+    # itself, so "exactly at the cap" vs "the real, larger value" both
+    # correctly trigger trimming.
+    def n_tokens(text):
+        return len(tokenizer(text, add_special_tokens=False, truncation=True, max_length=max_seq_length)["input_ids"])
+
+    if not contexts:
+        return []
+
+    fixed_tokens = sum(n_tokens(part) for part in fixed_parts)
+    budget = max_seq_length - _SBERT_SPECIAL_TOKENS - fixed_tokens
+    if budget <= 0:
+        print(
+            f"WARNING: label + observed words + candidate senses alone use "
+            f"{fixed_tokens} tokens, already at or beyond this text's "
+            f"{max_seq_length}-token budget -- context sentences are being cut "
+            "to a minimal fallback and the embedder's own truncation may still "
+            "reach into candidate senses for this one entry."
+        )
+        budget = 0
+
+    capped = []
+    remaining_budget = budget
+    remaining_sentences = len(contexts)
+    for context in contexts:
+        share = max(remaining_budget // remaining_sentences, 0)
+        context_tokens = n_tokens(context)
+        words = context.split()
+        if context_tokens <= share:
+            kept = context
+        else:
+            ratio = context_tokens / len(words) if words else 1.0
+            max_words = max(min_words_per_context, int(share / ratio)) if ratio > 0 else len(words)
+            max_words = min(max_words, len(words))
+            kept = " ".join(words[:max_words])
+            if max_words < len(words):
+                kept += " ..."
+        capped.append(kept)
+        remaining_budget -= n_tokens(kept)
+        remaining_sentences -= 1
+    return capped
+
+
 def build_stem_embeddings(accepted_definitions, embedder_name):
     """One embedding point per unique stem (an aggregated representative
     text over its instances), not one point per instance -- otherwise a
@@ -448,11 +977,11 @@ def build_stem_embeddings(accepted_definitions, embedder_name):
         contexts = list(dict.fromkeys(inst["sentence"] for inst in instances))[:3]
         definitions = list(dict.fromkeys(inst["definition"] for inst in instances))[:5]
 
-        stem_texts.append(
-            f"Stem: {stem}. Observed words: " + ", ".join(observed_words)
-            + ". Contexts: " + " ".join(contexts)
-            + ". Candidate senses: " + " ".join(definitions)
-        )
+        prefix = f"Stem: {stem}. Observed words: " + ", ".join(observed_words) + ". Contexts: "
+        suffix = ". Candidate senses: " + " ".join(definitions)
+        contexts = _fit_contexts_to_budget(embedder.tokenizer, embedder.max_seq_length, [prefix, suffix], contexts)
+
+        stem_texts.append(prefix + " ".join(contexts) + suffix)
         stem_names.append(stem)
 
     embeddings = embedder.encode(stem_texts, convert_to_numpy=True, normalize_embeddings=True)
@@ -489,6 +1018,15 @@ def build_stem_word_frequency_table(stem_occurrences):
 
 
 def rename_clusters(cluster_dict, stem_word_frequencies):
+    """Names each cluster after its single most-frequent observed word.
+    Two unrelated clusters can easily share a dominant word (a corpus-wide
+    high-frequency term like "trust" will top many different clusters'
+    counters), so names are disambiguated with the same numeric-suffix
+    strategy merge_named_clusters already uses for main-vs-noise collisions
+    -- without it, a plain dict assignment here would silently overwrite an
+    earlier same-named cluster and drop its stems entirely with no warning
+    (verified on real Boisseau data: 6 of 20 raw noise clusters collided
+    this way, all lost, before this fix)."""
     renamed = {}
     for label, stems in cluster_dict.items():
         cluster_word_counter = Counter()
@@ -502,7 +1040,14 @@ def rename_clusters(cluster_dict, stem_word_frequencies):
         max_freq = max(cluster_word_counter.values())
         top_words = sorted(word for word, freq in cluster_word_counter.items() if freq == max_freq)
 
-        renamed[" & ".join(top_words)] = {
+        base_name = " & ".join(top_words)
+        final_name = base_name
+        suffix = 2
+        while final_name in renamed:
+            final_name = f"{base_name} ({suffix})"
+            suffix += 1
+
+        renamed[final_name] = {
             "label": label,
             "stems": sorted(set(stems)),
             "top_frequency": max_freq,
@@ -580,11 +1125,11 @@ def _split_oversized_clusters_once(clusters, stem_occurrences, embedder, tokeniz
         contexts = list(dict.fromkeys(contexts))[:3]
         candidate_definitions = list(dict.fromkeys(candidate_definitions))[:5]
 
-        large_texts.append(
-            f"Stem: {stem}. Observed words: " + ", ".join(observed_words)
-            + ". Contexts: " + " ".join(contexts)
-            + ". Candidate senses: " + " ".join(candidate_definitions)
-        )
+        prefix = f"Stem: {stem}. Observed words: " + ", ".join(observed_words) + ". Contexts: "
+        suffix = ". Candidate senses: " + " ".join(candidate_definitions)
+        contexts = _fit_contexts_to_budget(embedder.tokenizer, embedder.max_seq_length, [prefix, suffix], contexts)
+
+        large_texts.append(prefix + " ".join(contexts) + suffix)
         large_stem_names.append(stem)
 
     large_embeddings = embedder.encode(large_texts, convert_to_numpy=True, normalize_embeddings=True)
@@ -699,10 +1244,12 @@ def recluster_noise(noise_stems, stem_occurrences, embedder, tokenizer, model, d
             results = glossbert_predict(occurrence, tokenizer, model, device, pos_map, max_synsets)
             if results is None:
                 continue
-            noise_texts.append(
-                f"Word: {occurrence['word']}. Sentence: {occurrence['sentence']}. "
-                "Candidate senses: " + " ".join(c["definition"] for c in results[:3])
+            prefix = f"Word: {occurrence['word']}. Sentence: "
+            suffix = ". Candidate senses: " + " ".join(c["definition"] for c in results[:3])
+            [sentence] = _fit_contexts_to_budget(
+                embedder.tokenizer, embedder.max_seq_length, [prefix, suffix], [occurrence["sentence"]],
             )
+            noise_texts.append(prefix + sentence + suffix)
             noise_stem_names.append(stem)
 
     if not noise_texts:

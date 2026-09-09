@@ -36,26 +36,56 @@ esc = html_lib.escape
 # READER -- full text with cluster-term highlighting
 # ============================================================
 
+def _mark_background(colors) -> str:
+    """CSS background for a highlighted token: the plain translucent
+    single color when only one cluster claims it (unchanged from before
+    multi-cluster support), or a hard-edged striped gradient combining
+    every claiming cluster's color when more than one does -- same 55
+    (~33%) alpha suffix per stripe as the single-color case, so a shared
+    stem/n-gram visibly shows all its clusters instead of one silently
+    winning and the rest vanishing (see build_reader_html)."""
+    if len(colors) == 1:
+        return f"background:{colors[0]}55;"
+    n = len(colors)
+    stops = []
+    for i, color in enumerate(colors):
+        start = round(100 * i / n, 3)
+        end = round(100 * (i + 1) / n, 3)
+        stops.append(f"{color}55 {start}%")
+        stops.append(f"{color}55 {end}%")
+    return f"background:linear-gradient(90deg, {', '.join(stops)});"
+
+
 def build_reader_html(doc, clusterdefs, colors_by_cluster, stemmer, max_chars=20000):
     """Full text with cluster-significant stems/n-grams highlighted and
     colour-coded by cluster -- token-level stem/lemma matching (see
     terms.py), not a regex approximation. Capped at max_chars for report
     size; states the truncation explicitly rather than silently cutting
-    the text."""
+    the text.
+
+    A stem/n-gram claimed by more than one cluster (a real possibility --
+    see recluster_noise's per-occurrence embedding, which doesn't
+    guarantee the clean one-stem-one-cluster partition the primary
+    clustering pass does) is highlighted with EVERY claiming cluster's
+    color, striped together (_mark_background), with the tooltip listing
+    every cluster name -- not silently attributed to whichever cluster
+    happens to come first alphabetically, which is what a plain
+    first-write-wins dict would do."""
     stems, lemmas = pterms.token_forms(doc, stemmer)
 
     stem_to_cluster = {}
     ngram_token_colors = {}
     for cluster in clusterdefs:
         color = colors_by_cluster.get(cluster["name"], "#888")
+        name = cluster["name"]
         for stem in cluster.get("stems", []):
             normalized = stem.rstrip("*").lower()
-            stem_to_cluster.setdefault(normalized, (color, cluster["name"]))
+            stem_to_cluster.setdefault(normalized, {})[name] = color
         for gram in cluster.get("ngrams", []):
             n = len(gram.split())
             for i in pterms.term_positions(stems, lemmas, gram):
                 for k in range(i, i + n):
-                    ngram_token_colors.setdefault(k, (color, cluster["name"]))
+                    ngram_token_colors.setdefault(k, {})[name] = color
 
     tokens = list(doc)
     pieces = []
@@ -67,15 +97,16 @@ def build_reader_html(doc, clusterdefs, colors_by_cluster, stemmer, max_chars=20
             break
         char_budget -= len(token.text_with_ws)
 
-        color_name = ngram_token_colors.get(idx)
-        if color_name is None and stems[idx]:
-            color_name = stem_to_cluster.get(stems[idx])
+        color_map = ngram_token_colors.get(idx)
+        if not color_map and stems[idx]:
+            color_map = stem_to_cluster.get(stems[idx])
 
-        if color_name:
-            color, name = color_name
+        if color_map:
+            colors = list(color_map.values())
+            names = ", ".join(color_map.keys())
             pieces.append(
-                f'<mark style="background:{color}55;padding:0 1px;border-radius:2px;" '
-                f'title="{esc(name)}">{esc(token.text)}</mark>{esc(token.whitespace_)}'
+                f'<mark style="{_mark_background(colors)}padding:0 1px;border-radius:2px;" '
+                f'title="{esc(names)}">{esc(token.text)}</mark>{esc(token.whitespace_)}'
             )
         else:
             pieces.append(esc(token.text) + esc(token.whitespace_))

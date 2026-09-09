@@ -1,0 +1,279 @@
+{
+    "excludedNgrams": [
+        "agent matter",
+        "ai system éloïse",
+        "artificial system kind",
+        "certain way",
+        "conjoin issue trust",
+        "epistemic agent",
+        "epistemic dependence",
+        "expert subject matter",
+        "expertise reveal",
+        "form opacity",
+        "gain knowledge",
+        "human expertise",
+        "let simply",
+        "machine learning",
+        "matter fact",
+        "opaque ai technology",
+        "present form",
+        "system éloïse boisseau",
+        "trust agent",
+        "trust artificial system",
+        "trust human",
+        "trust human expert",
+        "trust place expert"
+    ],
+    "clusterDefs": [
+        {
+            "name": "action",
+            "stems": [
+                "action",
+                "causal",
+                "ration"
+            ],
+            "ngrams": [
+                "action decision"
+            ],
+            "excluded_stems": [
+                "agent"
+            ],
+            "excluded_ngrams": [
+                "trust agent",
+                "agent matter"
+            ]
+        },
+        {
+            "name": "agent",
+            "stems": [
+                "agent",
+                "causal",
+                "term"
+            ],
+            "ngrams": [
+                "trust agent",
+                "agent matter"
+            ],
+            "excluded_stems": [
+                "abl",
+                "possibl"
+            ],
+            "excluded_ngrams": []
+        },
+        {
+            "name": "character",
+            "stems": [
+                "charact",
+                "expert",
+                "human"
+            ],
+            "ngrams": [
+                "intellectual character",
+                "character expert",
+                "expert competence"
+            ],
+            "excluded_stems": [],
+            "excluded_ngrams": []
+        },
+        {
+            "name": "epistemic",
+            "stems": [
+                "epistem",
+                "expertis",
+                "use"
+            ],
+            "ngrams": [
+                "epistemic dependence",
+                "epistemic agent",
+                "human expert",
+                "expertise reveal"
+            ],
+            "excluded_stems": [
+                "abil",
+                "expert",
+                "form",
+                "matter",
+                "subject",
+                "term"
+            ],
+            "excluded_ngrams": [
+                "expert subject matter",
+                "trust place expert",
+                "present form",
+                "form opacity",
+                "human expertise"
+            ]
+        },
+        {
+            "name": "epistemic AI",
+            "stems": [
+                "artifici",
+                "sens"
+            ],
+            "ngrams": [
+                "trust artificial system",
+                "artificial system kind",
+                "epistemic dependence",
+                "epistemic agent"
+            ],
+            "excluded_stems": [
+                "epistem",
+                "point"
+            ],
+            "excluded_ngrams": []
+        },
+        {
+            "name": "expectation",
+            "stems": [
+                "expect",
+                "matter",
+                "posit"
+            ],
+            "ngrams": [
+                "positive expectation"
+            ],
+            "excluded_stems": [
+                "agent"
+            ],
+            "excluded_ngrams": [
+                "trust agent",
+                "agent matter",
+                "matter fact"
+            ]
+        },
+        {
+            "name": "expertise",
+            "stems": [
+                "describ",
+                "justifi",
+                "knowledg"
+            ],
+            "ngrams": [
+                "gain knowledge",
+                "conception expertise",
+                "expertise ai system",
+                "describe expert",
+                "expertise opacity trust",
+                "trust ai system"
+            ],
+            "excluded_stems": [
+                "expert",
+                "expertis",
+                "hand",
+                "simpli",
+                "system",
+                "thing"
+            ],
+            "excluded_ngrams": [
+                "ai system éloïse",
+                "system éloïse boisseau",
+                "trust place expert"
+            ]
+        },
+        {
+            "name": "human",
+            "stems": [
+                "epistem",
+                "human",
+                "knowledg",
+                "testimoni"
+            ],
+            "ngrams": [
+                "epistemic agent",
+                "acquire knowledge",
+                "place human expert"
+            ],
+            "excluded_stems": [
+                "artifici",
+                "let",
+                "notion",
+                "possibl",
+                "simpli",
+                "technolog",
+                "way"
+            ],
+            "excluded_ngrams": [
+                "epistemic dependence",
+                "gain knowledge",
+                "opaque ai technology",
+                "trust artificial system",
+                "let simply",
+                "trust human",
+                "certain way",
+                "artificial system kind"
+            ]
+        },
+        {
+            "name": "moral",
+            "stems": [
+                "action",
+                "causal",
+                "moral",
+                "ration"
+            ],
+            "ngrams": [
+                "action decision",
+                "moral character"
+            ],
+            "excluded_stems": [
+                "machin"
+            ],
+            "excluded_ngrams": [
+                "machine learning"
+            ]
+        },
+        {
+            "name": "systems",
+            "stems": [
+                "concept",
+                "context",
+                "epistem",
+                "expertis",
+                "system",
+                "use"
+            ],
+            "ngrams": [
+                "artificial system model"
+            ],
+            "excluded_stems": [
+                "way"
+            ],
+            "excluded_ngrams": [
+                "epistemic dependence",
+                "epistemic agent",
+                "expertise reveal",
+                "certain way",
+                "trust artificial system",
+                "trust human expert"
+            ]
+        },
+        {
+            "name": "trust",
+            "stems": [
+                "artefact",
+                "artifici",
+                "follow",
+                "let",
+                "point",
+                "relianc",
+                "sens",
+                "system",
+                "trust"
+            ],
+            "ngrams": [
+                "trust artificial system",
+                "aspect trust",
+                "trust ai system",
+                "expertise opacity trust",
+                "opacity trust ai",
+                "issue trust place"
+            ],
+            "excluded_stems": [],
+            "excluded_ngrams": [
+                "ai system éloïse",
+                "system éloïse boisseau",
+                "conjoin issue trust"
+            ]
+        }
+    ]
+}

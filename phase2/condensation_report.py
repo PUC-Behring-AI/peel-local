@@ -236,7 +236,20 @@ def _render_blocks_with_toggles(body_blocks, all_spans, source_sentences):
 # ============================================================
 
 def build_meta_legend(corpus_name, source_word_count, rate, condensed_word_count,
-                       phase1_json_name, span_counts):
+                       phase1_json_name, span_counts, adversarial_notice=None):
+    # Always rendered, never silently omitted -- a missing row here would
+    # be genuinely ambiguous (did the adversarial reviewer run and find
+    # nothing, or does this report predate the feature?), matching
+    # build_human_report's "Adversarial review" section below, which
+    # always states one outcome or the other explicitly.
+    if adversarial_notice:
+        adversarial_status = f"Fixed &mdash; {esc('; '.join(adversarial_notice))}"
+    else:
+        adversarial_status = "Unchanged (no issues found)"
+    adversarial_row = (
+        f'<tr><td style="{S["meta_td1"]}">Adversarial review</td>'
+        f'<td style="{S["meta_td2"]}">{adversarial_status}</td></tr>'
+    )
     return f"""
 <div style="{S['meta']}">
   <table style="border-collapse:collapse">
@@ -249,6 +262,7 @@ def build_meta_legend(corpus_name, source_word_count, rate, condensed_word_count
         <td style="{S['meta_td2']}">{esc(phase1_json_name)}</td></tr>
     <tr><td style="{S['meta_td1']}">Injections</td>
         <td style="{S['meta_td2']}">F={span_counts.get('F', 0)} &middot; T={span_counts.get('T', 0)} &middot; R={span_counts.get('R', 0)} &middot; C={span_counts.get('C', 0)}</td></tr>
+    {adversarial_row}
     <tr><td style="{S['meta_td1']}">Pipeline</td>
         <td style="{S['meta_td2']}">{esc(PIPELINE_VERSION)}</td></tr>
     </tbody>
@@ -330,19 +344,22 @@ def build_coverage_table(coverage_report):
 
 def build_condensation_fragment(condensed_text, all_spans, source_sentences, coverage_report,
                                  corpus_name, rate, source_word_count, phase1_json_name,
-                                 title=None, authors=None, date=None):
+                                 title=None, authors=None, date=None, adversarial_notice=None):
     """title/authors/date: the source document's own metadata, collected
     explicitly (typed in, or LLM-extracted -- see
     run_source_metadata_setup/extract_source_metadata), not guessed from
     the condensed text. Optional so existing callers (e.g. phase2.ipynb)
-    keep working unmodified, falling back to corpus_name with no byline."""
+    keep working unmodified, falling back to corpus_name with no byline.
+
+    adversarial_notice: list of issue descriptions if run_adversarial_review
+    fixed this text, else None -- see build_meta_legend."""
     blocks = parse_condensed_blocks(condensed_text)
 
     section_blocks = _render_blocks_with_toggles(blocks, all_spans, source_sentences)
     span_counts = Counter(s["type"] for s in all_spans)
     meta_legend = build_meta_legend(
         corpus_name, source_word_count, rate, len(condensed_text.split()),
-        phase1_json_name, span_counts,
+        phase1_json_name, span_counts, adversarial_notice=adversarial_notice,
     )
     cov_table = build_coverage_table(coverage_report)
 
@@ -369,7 +386,8 @@ def build_standalone_preview(fragment_html, corpus_name):
 
 
 def build_human_report(all_spans, borderline_flags, coverage_report,
-                        verbatim_overlap_pct, non_injected_pct, sanity_issues=None):
+                        verbatim_overlap_pct, non_injected_pct, sanity_issues=None,
+                        adversarial_notice=None):
     span_counts = Counter(s["type"] for s in all_spans)
     lines = [
         "PEEL-Local Phase 2 Condensation -- Verification Report",
@@ -386,6 +404,14 @@ def build_human_report(all_spans, borderline_flags, coverage_report,
         lines.append("  none")
     else:
         for issue in sanity_issues:
+            lines.append(f"  - {issue}")
+
+    lines += ["", "Adversarial review (semantic/qualitative pass over the accepted text):"]
+    if not adversarial_notice:
+        lines.append("  no issues found -- text unchanged")
+    else:
+        lines.append("  fixed -- the pre-fix text is preserved in the Phase 2 decision log:")
+        for issue in adversarial_notice:
             lines.append(f"  - {issue}")
 
     lines += ["", "Borderline classification flags:"]

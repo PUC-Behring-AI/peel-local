@@ -15,7 +15,20 @@ Instead, it provides computational support for:
 Interpretation remains researcher-driven.
 
 For a function-by-function map of the codebase (what's implemented where,
-and what calls what), see [FUNCTIONS.md](FUNCTIONS.md).
+and what calls what), see [FUNCTIONS.md](FUNCTIONS.md). For every prompt
+sent to an AI model -- exact template, implementing function, and which
+workflow step it belongs to -- see
+[docs/ai_prompts_catalog.md](docs/ai_prompts_catalog.md). For a visual
+overview of the whole pipeline, see the diagrams at the repo root:
+`PEEL-Local-pipeline-overview.png`/`.pdf` (a compact, publication-oriented
+figure organized around the ten interactive screens a researcher moves
+through in order -- Setup, Progress, Parameter sweep, Flagged-term
+review, Cluster review, Phase 2 setup, Escalation, Borderline
+classification review, Collocation-pair selection, Complete -- with each
+screen's box captioned by the automatic processing that runs on the way
+to it) and `PEEL-Local-pipeline-full.html` (every step, click-to-expand,
+with full reproducibility detail per node -- open it directly in a
+browser, no server needed).
 
 ---
 
@@ -29,22 +42,29 @@ its input from the previous phase's output (see
    running headers/footers, footnote-call digits, broken hyphenation,
    front matter (mastheads, copyright notices, abstracts), and end
    sections (notes/references) from a raw `.txt` corpus.
-2. **Phase 1 -- Semantic analysis** (`phase1/phase1.ipynb`): extracts
+2. **Phase 1 -- Semantic analysis** (`phase1/phase1.ipynb`): optionally,
+   first previews several candidate stem-percentile thresholds (a
+   parameter sweep -- see below) before committing to one; extracts
    frequent word stems, maps each occurrence to its word, stem, part of
    speech, and sentence, retrieves WordNet synsets, predicts the most
-   likely sense with GlossBERT (Word Sense Disambiguation), builds
-   Sentence-BERT embeddings from the accepted definitions, and clusters
-   them with HDBSCAN into semantic groups. Flagged sense mismatches and
-   the resulting clusters go through optional manual review, and the
-   outcome -- plus every decision made along the way -- is exported to
-   JSON and HTML.
+   likely sense with GlossBERT (Word Sense Disambiguation) -- optionally
+   merging a word's repeated occurrences into one prediction first, so it
+   can't be flagged for review more than once -- builds Sentence-BERT
+   embeddings from the accepted definitions, and clusters them with
+   HDBSCAN into semantic groups. Flagged sense mismatches (accept, edit,
+   or delete the word entirely) and the resulting clusters go through
+   optional manual review, and the outcome -- plus every decision made
+   along the way -- is exported to JSON and HTML.
 3. **Phase 2 -- Informative sentence selection & condensation**
    (`phase2/phase2.ipynb`): for each Phase 1 cluster, scores every
    sentence in the corpus by lexical density and how many of the
    cluster's stems/n-grams it contains, keeping the top-scoring
    sentences as representative examples. Optionally, it then prompts a
    locally running LLM (via [Ollama](https://ollama.com)) to condense the
-   corpus to a chosen target rate, and verifies that condensation --
+   corpus to a chosen target rate; a second LLM pass then audits (and can
+   fix) that accepted text -- abrupt endings, garbled sequences, drift
+   outside the source material -- before anything downstream reads it;
+   and finally the pipeline verifies the (possibly fixed) condensation --
    classifying every non-verbatim span by injection risk, scanning for
    verbatim overlap with the source, and checking per-cluster term
    coverage -- before exporting a standalone HTML report. See
@@ -190,10 +210,12 @@ data/<CORPUS_NAME>/
     └── phase3_decisions.jsonl
 ```
 
-`data/` is git-ignored, with no exceptions -- generated/corpus-specific
-content shouldn't pile up in version control. There's no example corpus
-bundled with the repo; `raw/<CORPUS_NAME>.txt` always comes from your own
-input file (see below).
+`data/` is tracked in version control -- example corpora (Boisseau, etc.)
+are committed as worked examples of PEEL-Local's own output, so you can
+inspect a complete run's artifacts without generating one yourself first.
+`raw/<CORPUS_NAME>.txt` for your own corpus still always comes from your
+own input file (see below); commit your own corpus's output under `data/`
+only if you actually want it in version control.
 
 ---
 
@@ -285,8 +307,10 @@ count, then verify that condensation. This requires
 the config cell checks for it and lists installed models.
 
 **Generation**: you're prompted for one or more target rates (5-30% of
-the source word count), an Ollama model name, and a maximum number of
-generation trials. Generation always runs with `repeat_penalty: 1.0`
+the source word count), an Ollama model name, a model for the
+adversarial reviewer below (ENTER to reuse the generation model), and a
+maximum number of generation trials. Generation always runs with
+`repeat_penalty: 1.0`
 (Ollama's neutral value), so no implicit anti-repetition bias from the
 model's own Modelfile suppresses legitimate reuse of source/cluster key
 terms. Each trial is checked against both the target word count (±5%
@@ -308,6 +332,27 @@ as an outright success if it clears tolerance *and* all three checks; if
 every trial fails the checks, the closest-by-word-count trial is still
 used (never silently discarded) but clearly flagged as unreviewed in the
 console output, decision log, and human-readable report.
+
+**Adversarial review.** Once a trial is accepted for a rate -- whichever
+path got it there (immediate success, sanity review, escalation, or the
+soft-accept fallback) -- a second, independently-choosable Ollama model
+reads it once more, checking for three things the sanity checks above
+can't (they're regex/statistical, this is a semantic judgment call): an
+abrupt/mid-thought ending, garbled or nonsensical token sequences, or
+content drifting outside the informative-sentence pool it was supposed
+to be built from. If it finds a problem, it fixes only that problem
+(smallest possible edit, still targeting the original word count), and
+the **fixed text -- not the original -- is what gets saved and used by
+every downstream step**: word counts, cluster coverage, injection
+classification, and the reports all recompute from it automatically. The
+original pre-fix text is always preserved in
+`data/<CORPUS_NAME>/decisions/phase2_decisions.jsonl` for audit even when
+a fix is applied, and a fix is disclosed to you either way -- a console
+print (CLI/notebook), a notice on the web UI's completion screen, and an
+"Adversarial review" line/section in the condensation reports. It fails
+safe: an unreachable Ollama, a response that doesn't follow the expected
+format, or a fixed text that's empty or implausibly short all just keep
+the original text rather than risk substituting something worse.
 
 **Verification**, per rate:
 - **Injection taxonomy** -- every non-verbatim sentence in the
@@ -370,7 +415,8 @@ and a run summary -- as its own cleanly styled, self-contained page (see
 `common/standalone_report.py`).
 
 Every choice made in this flow (rates, model, trial outcomes, escalation,
-reclassifications) is logged to `data/<CORPUS_NAME>/decisions/phase2_decisions.jsonl`,
+adversarial-review outcomes, reclassifications) is logged to
+`data/<CORPUS_NAME>/decisions/phase2_decisions.jsonl`,
 same schema as Phase 1's decision log below.
 
 **Regenerating a condensation.** After all requested rates are generated
@@ -506,46 +552,85 @@ trial results, etc.) rather than a bare spinner. When a chunk finishes
 and needs a decision, the page shows the corresponding form; submitting
 it resumes the pipeline in the background.
 
+A **"Restart"** button in the header is available on every screen, not
+just the completion screen's "Start another run" -- it discards the
+current run and returns to setup, after a confirmation dialog since it
+can be clicked mid-run. If a background step (GlossBERT, clustering,
+Ollama generation) is actually in flight when you restart, that
+computation keeps running to completion in the background -- there's no
+way to forcibly cancel it -- but it's discarded once finished rather than
+shown or used, since nothing references the old session anymore.
+
 ### Screens, in order
 
-1. **Setup** -- corpus name, file upload (`.txt`, `.md`/`.markdown`, or
-   `.pdf` -- converted to plain text the same way `run_pipeline.py`'s
-   `--input` is), optional "clean with Phase 0" checkbox, and a
-   collapsible advanced-settings panel with every Phase 1 config field
-   (same defaults as the CLI).
+1. **Setup** -- a "New corpus" / "Resume an existing corpus" toggle at
+   the top switches between two forms:
+   - **New corpus**: corpus name, file upload (`.txt`, `.md`/`.markdown`,
+     or `.pdf` -- converted to plain text the same way `run_pipeline.py`'s
+     `--input` is), optional "clean with Phase 0" checkbox, and a
+     collapsible advanced-settings panel with every Phase 1 config field
+     (same defaults as the CLI), including checkboxes for merging
+     duplicate word occurrences before WSD and for previewing
+     frequency-percentile candidates before extracting stems.
+   - **Resume an existing corpus** -- mirrors `run_pipeline.py --start-phase`:
+     a dropdown of every corpus under `data/` (from `GET /api/corpora`,
+     which uses the same `common/resume.py::check_prerequisites` the CLI
+     does), and a "start from" dropdown offering only the phases that
+     corpus actually has the required files for (Phase 2 needs a saved
+     Phase 1 state; Phase 3 additionally needs at least one
+     already-generated condensed rate, shown in a hint once picked).
+     Resuming reuses the corpus's saved raw text and Phase 1 state as-is
+     -- no file upload, no Phase 1 config fields -- and picks up exactly
+     where `run_pipeline.py --start-phase 2`/`3` would.
 2. **Progress console** -- live log panel + current step name.
-3. **Flagged-term review** -- one row per flagged term, with the
+3. **Parameter sweep** (only if that checkbox was checked) -- one card
+   per candidate `frequency_percentile` (each one's true stem count,
+   uncapped by "Max stems" -- a larger `frequency_percentile` is a
+   stricter cutoff and keeps *fewer* stems, matching the everyday sense of
+   a percentile cutoff (e.g. "90th percentile" meaning "top 10%") -- plus
+   distinct derived-word count, sentence coverage, and
+   informative-sentence counts at a few density-percentile bands), plus a
+   "custom values" card with its own frequency-percentile/max-stems
+   fields. If "Word frequency percentile" was set above 0 on the setup
+   screen, the distinct-word and sentence-coverage counts already reflect
+   that filter, not the unfiltered corpus.
+4. **Flagged-term review** -- one row per flagged term, with the
    sentence, default vs. predicted definition, and a choice control
-   (keep default / use predicted / pick a candidate / manual entry);
-   plus a "use predicted for all" quick action. All rows submitted together.
-4. **Cluster review** -- one card per cluster: editable name, and a
+   (keep default / use predicted / pick a candidate / manual entry /
+   delete the word entirely); plus a "use predicted for all" quick
+   action. All rows submitted together.
+5. **Cluster review** -- one card per cluster: editable name, and a
    checkbox per stem and n-gram (uncheck to remove).
-5. **Phase 2 setup** -- `top_n`/density-percentile fields, a "generate a
+6. **Phase 2 setup** -- `top_n`/density-percentile fields, a "generate a
    condensation?" Yes/No toggle, and (if yes) rate(s), an Ollama model
-   dropdown (populated live from Ollama, with an availability check),
-   max trials, and the source's title/author(s)/date -- three optional
-   text fields, or a checkbox to have the model determine them instead.
-6. **Escalation** (only if triggered) -- per rate that missed its target
+   dropdown and a separate adversarial-reviewer model dropdown (both
+   populated live from Ollama, with an availability check), max trials,
+   and the source's title/author(s)/date -- three optional text fields,
+   or a checkbox to have the model determine them instead.
+7. **Escalation** (only if triggered) -- per rate that missed its target
    word count: the trial results and a Yes/No "retry with full source
    text?" button.
-7. **Borderline classification review** (only if any exist) -- per
+8. **Borderline classification review** (only if any exist) -- per
    flagged span: the text, the reason it was flagged, and
    `[Keep] [F] [T] [R] [C]` buttons.
-8. **Collocation-pair selection** (Phase 3, only if a condensation was
+9. **Collocation-pair selection** (Phase 3, only if a condensation was
    generated and a real source collocation was found) -- a table of
    ranked, confound-flagged term pairs; check one or more, then submit.
-9. **Complete** -- links to every generated file (Phase 1 outputs, both
-   decision logs, the Phase 3 distant reading report, and per-rate
-   condensation/standalone-report files), served straight from the
-   browser, plus a **"Regenerate a
-   condensation"** panel: a rate field (existing rate = overwrite in
-   place, new rate = add alongside the rest) and a "Preview / edit
-   default prompt" button that reveals the full rendered prompt in an
-   editable text box before you submit. Regenerating reuses the same
-   progress-console/polling flow as any other step, then returns here
-   with the manifest updated. "Start another run" resets the server-side
-   session before reloading, so it correctly returns to the setup screen
-   instead of bouncing back to this one.
+10. **Complete** -- a **"Phase 1 outputs"** panel (state JSON, cluster
+    HTML), a **"Phase 2 outputs"** panel (the informative-sentences JSON,
+    then one card per condensation rate -- each showing an adversarial-fix
+    notice when one applies, plus links to the condensed text, injection
+    report, and every report file), the Phase 3 distant-reading report,
+    and a **"Decision logs"** panel (Phase 1 + Phase 2 JSONL logs) --
+    every file link served straight from the browser -- plus a
+    **"Regenerate a condensation"** panel: a rate field (existing rate =
+    overwrite in place, new rate = add alongside the rest) and a "Preview
+    / edit default prompt" button that reveals the full rendered prompt
+    in an editable text box before you submit. Regenerating reuses the
+    same progress-console/polling flow as any other step, then returns
+    here with the manifest updated. "Start another run" resets the
+    server-side session before reloading, so it correctly returns to the
+    setup screen instead of bouncing back to this one.
 
 Every decision submitted through the web UI is logged via the same
 `common/decisions.py` `DecisionLog` as the notebooks and
@@ -565,39 +650,85 @@ that already has a `phase1_state.json`, use `phase2/phase2.ipynb` or
 
 ## Interactive review & decision log
 
-Phase 1 has two points where you make interpretive calls:
+Phase 1 has three points where you make interpretive calls (the first is
+optional and methodological, the other two are per-item review):
 
-1. **Flagged term review** -- for each stem/word whose GlossBERT-predicted
+1. **Parameter sweep** (optional, before anything else runs) -- compares
+   several candidate `frequency_percentile` thresholds by their true,
+   uncapped stem count (`frequency_percentile` is a statistical percentile
+   cutoff on the frequency-ranked stem vocabulary -- a *larger* value is a
+   *stricter* bar and keeps *fewer*, more frequent stems, e.g. 0.75 keeps
+   only the top 25% most-frequent stems, matching the everyday sense of a
+   percentile cutoff like "90th percentile" meaning "top 10%"), how many
+   sentences they touch, and how many of those clear a few
+   informative-sentence percentile bands (reusing Phase 2's own scoring),
+   so you can pick a `frequency_percentile`/`max_stems` with some evidence
+   behind it instead of guessing -- `max_stems` itself is applied
+   afterward, only to whichever value you pick, not to the sweep's own
+   counts. The sweep also reports each candidate's distinct derived-word
+   count -- already filtered by `word_frequency_percentile` if you've set
+   one, so what you see previews the real post-filter corpus, not the
+   unfiltered one. Skip it (don't run the notebook cell / omit `--sweep` /
+   leave the checkbox unchecked) to use the configured defaults directly,
+   same as before this existed.
+2. **Flagged term review** -- for each stem/word whose GlossBERT-predicted
    sense disagrees with WordNet's default sense, accept the prediction,
-   keep the default, enter a manual definition, or review all of them at
-   once. Words are matched case-insensitively (a word appearing once in
-   an all-caps heading and once in normal prose no longer produces two
-   separate review items for the same underlying mismatch), and the
-   candidate list respects your configured `max_synsets` (previously
-   capped at 3 regardless of that setting).
-2. **Cluster review** -- accept, rename, or edit each semantic cluster:
+   keep the default, enter a manual definition, delete the word from all
+   following steps entirely, or review all of them at once. Words are
+   matched case-insensitively (a word appearing once in an all-caps
+   heading and once in normal prose no longer produces two separate
+   review items for the same underlying mismatch), and the candidate list
+   respects your configured `max_synsets` (previously capped at 3
+   regardless of that setting). Optionally, occurrences of the same word
+   can also be merged into one combined context before GlossBERT even
+   runs (`merge_duplicate_word_occurrences`), so a word landing on two
+   different predicted senses across its occurrences produces at most one
+   review item instead of two. Separately, `word_frequency_percentile`
+   (default `0`, off) can trim which *distinct* derived words per stem
+   even reach GlossBERT/review in the first place -- a percentile cutoff
+   on each stem's own derived-word frequency (e.g. `0.75` keeps only the
+   top 25% most-frequent forms of that stem, always keeping at least one),
+   so a stem with many long-tail inflections ("observation"/"observes"/
+   "observably"/...) doesn't multiply into that many separate review
+   items.
+3. **Cluster review** -- accept, rename, or edit each semantic cluster:
    remove stems or n-grams from it.
+
+Beyond these three interactive moments, every Phase 1 CONFIG value --
+`frequency_percentile`, `max_stems`, `word_frequency_percentile`,
+`max_sentences_per_stem`, `max_synsets`, `merge_duplicate_word_occurrences`,
+`max_cluster_size`, `min_clusters`, `min_cluster_len`, `glossbert_model`,
+`lang_model`, `sentence_embedder` -- is also logged, one entry per
+parameter under `step="phase1_setup"`, regardless of which interface you
+used or whether you touched the interactive sweep. Phase 2's `top_n`/
+`density_percentile` (`step="phase2_setup"`, `sentence_selection_config`)
+and (webapp only) whether condensation was generated at all
+(`run_condensation_choice`) are logged the same way. This means the full
+configuration a run actually used is reconstructable from the decision
+log alone, not just its interactive review choices.
 
 The final `<CORPUS_NAME>-phase1_state.json` only records the *outcome* of
 these steps. Every individual choice is also appended, as it happens, to
 `data/<CORPUS_NAME>/decisions/phase1_decisions.jsonl` via
 `common/decisions.py`'s `DecisionLog`, so the reasoning behind a cluster
-or definition can be consulted later even if the final state doesn't
-show it. Each line is a JSON object:
+or definition -- or simply what a run was configured with -- can be
+consulted later even if the final state doesn't show it. Each line is a
+JSON object:
 
 | field | meaning |
 |---|---|
 | `timestamp` | ISO-8601 UTC time the decision was recorded |
 | `corpus`, `phase` | which corpus/phase this belongs to |
-| `step` | review point (`flagged_term_review`, `cluster_review`; Phase 2/3 keep their own logs with the same schema, e.g. `condensation_setup`, `injection_review`, `collocation_review`) |
+| `step` | review point (`phase1_setup`, `phase1_parameter_sweep`, `flagged_term_review`, `cluster_review`; Phase 2/3 keep their own logs with the same schema, e.g. `phase2_setup`, `condensation_setup`, `condensation_generation` (includes `adversarial_review_result`), `injection_review`, `collocation_review`) |
 | `decision_type` | specific sub-decision (e.g. `per_term_choice`, `stem_removal`) |
 | `prompt` | the exact prompt text shown |
 | `options` | the menu/candidates presented, if any |
 | `choice` | the raw input given |
 | `extra` | free-form context (word/stem, cluster name, resulting definition, removed items, ...) |
 
-The log is append-only and local (`data/` is git-ignored), so it doesn't
-affect the interactive flow and isn't shared unless you choose to.
+The log is append-only, so it doesn't affect the interactive flow. It's
+part of `data/`, which is tracked in version control (see above) --
+commit or discard your own corpus's log as you choose.
 
 ---
 
@@ -609,10 +740,13 @@ peel-local/
 ├── FUNCTIONS.md       # function-by-function map of the codebase
 ├── RUN_PIPELINE_GUIDE.md  # detailed run_pipeline.py CLI guide
 ├── run_pipeline.py    # Phase 0 (optional) -> 1 -> 2 -> 3 -> standalone report export, one command
+├── PEEL-Local-pipeline-overview.png / .pdf  # compact, screen-by-screen pipeline diagram
+├── PEEL-Local-pipeline-full.html            # full interactive pipeline diagram, click-to-expand
+├── docs/              # ai_prompts_catalog.md -- every AI-model prompt, where it's implemented
 ├── requirements.txt
 ├── .gitignore
 ├── common/            # shared modules: data-directory contract, decision log,
-│                       # Ollama client, standalone report
+│                       # Ollama client, standalone report, Phase 1 parameter sweep
 ├── phase0/            # phase0.ipynb + clean_corpus.py -- corpus cleaning
 ├── phase1/            # phase1.ipynb + pipeline.py -- stems, WSD, clustering
 ├── phase2/            # phase2.ipynb + pipeline.py (sentence selection) +
@@ -621,5 +755,10 @@ peel-local/
 │                       # comparison.py + collocations.py + stopwords.py +
 │                       # terms.py + report.py -- distant reading, no notebook
 ├── webapp/            # Flask web interface -- app.py, pipeline_session.py, static/
-└── data/              # per-corpus inputs/outputs (git-ignored, see contract above)
+└── data/              # per-corpus inputs/outputs (tracked, see contract above)
 ```
+
+(`docgraph/` also exists at the repo root -- the generator tooling for the
+two diagrams above. It's gitignored on purpose: the diagrams are the
+committed deliverable, not the code that builds them. Regenerate with
+`python docgraph/generate_all.py` after a pipeline change.)

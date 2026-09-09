@@ -1,0 +1,211 @@
+PEEL-Local Phase 2 Condensation -- Verification Report
+========================================================
+
+Injection spans: F=3  T=19  R=18  C=71
+Non-injected (word share outside classified spans): 22.0%
+Independent verbatim-overlap scan: 54.7%
+
+Generation sanity checks (invented vocabulary, runaway tokens, repetition loops):
+  none
+
+Adversarial review (semantic/qualitative pass over the accepted text):
+  no issues found -- text unchanged
+
+Borderline classification flags:
+  s100 (T): 14 content-bearing tokens -- unusually high for a metalinguistic span; may carry object-level content that belongs in R or C instead
+    "But as we have seen, this comparison collapses under scrutiny because it fails to account for the moral and social dimensions of human expertise."
+  s130 (T): Nearly identical to its closest candidate source sentence (94% content-word overlap) -- diverges by 1 content-bearing token(s): 'conceptualizing'. Called metalinguistic, but this close to a real source sentence it may carry object-level content that belongs in R or C instead.
+    "The fourth section of the paper will show the limits of this conception of expertise, and will argue against conceptualizing trust in artificial systems on the model of trust in human experts."
+
+Cluster coverage:
+  action: target 3.6%, actual 1.8% (-1.8pp) -- OK
+  agent: target 3.6%, actual 2.2% (-1.4pp) -- OK
+  character: target 14.4%, actual 18.1% (+3.7pp) -- OK
+  epistemic: target 12.9%, actual 13.3% (+0.4pp) -- OK
+  epistemic AI: target 4.2%, actual 2.8% (-1.4pp) -- OK
+  expectation: target 2.9%, actual 1.4% (-1.5pp) -- OK
+  expertise: target 3.7%, actual 2.2% (-1.5pp) -- OK
+  human: target 11.3%, actual 15.7% (+4.4pp) -- OK
+  moral: target 4.7%, actual 3.4% (-1.3pp) -- OK
+  systems: target 19.4%, actual 19.5% (+0.1pp) -- OK
+  trust: target 19.4%, actual 19.7% (+0.3pp) -- OK
+
+Compression (C) and Reformulation (R) spans -- source citations:
+  s3 (C): Philosophers and sociologists have long examined these dynamics, noting that our reliance on others for knowledge acquisition is a fundamental aspect of human existence.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s4 (C): This notion of deference hinges on more general relationships of 'epistemic dependence,' to use John Hardwig's expression, where individuals surrender the full burden of verification to those they deem competent.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s6 (C): doctors diagnosing illnesses, scientists publishing findings, or legal experts interpreting statutes.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s8 (R): These programs are proving to be extremely versatile; depending on the data they are 'trained' on, they can carry out tasks—hitherto exclusively reserved to human experts—with a certain degree of autonomy and in a generally highly satisfactory manner.
+    Paraphrases source sentence 8 (content-word overlap 81%).
+  s9 (C): This shift forces us to revisit traditional matters about trust, dependence, and expertise.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s10 (C): We must ask whether these tools function merely as instruments or if they have become bona fide new experts.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s12 (C): In the context of medical diagnosis and imaging, algorithms assist physicians in interpreting scans and identifying pathology with remarkable speed and sometimes accuracy.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s13 (C): In policing—within what is sometimes referred to as 'predictive policing'—these systems analyze historical data to predict crime hotspots or assess risk.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s14 (C): In banking, finance, and insurance, similar models manage credit risk, detect fraud, and optimize portfolios.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s16 (R): Opaque systems are furthermore frequently referred to in the literature as epistemic 'black boxes,' insofar as it is virtually impossible to verify or obtain any kind of explanation or justification concerning the production of a particular output.
+    Paraphrases source sentence 21 (content-word overlap 91%).
+  s17 (R): The use of such 'opaque' systems naturally poses a number of ethical problems, including embarrassing cases of 'responsibility gaps' and algorithmic biases.
+    Paraphrases source sentence 23 (content-word overlap 75%).
+  s18 (C): When an opaque system makes a harmful error, who is responsible?
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s19 (C): The programmer?
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s23 (C): These questions have led to debates regarding the nature of agency and moral responsibility.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s27 (C): This analogy rests on two primary pillars: first, the shared characteristic of opacity between human experts and AI systems; second, the functional success of AI systems, which supposedly warrants trust regardless of internal process transparency.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s30 (R): The trust that users place in their GPS is then understood as what Mark Coeckelbergh ultimately describes as a merely predictive trust.
+    Paraphrases source sentence 62 (content-word overlap 100%).
+  s31 (C): We rely on the device to function correctly, but we do not necessarily understand or care about its internal workings.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s33 (C): When we trust a human expert, we are implicitly trusting their virtue: their integrity, their conscientiousness, their commitment to truth.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s34 (C): Trust in an instrument is different; it is grounded in past performance and physical mediation rather than epistemic character.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s35 (C): Yet, many proponents of AI as expert argue that deep learning systems have crossed the threshold from mere instruments to genuine epistemic agents.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s39 (R): The functioning of expert systems is indeed solely based on a form of 'mere computation, calculation and memory retrieval' in contrast to which Alvarado defines the truly epistemic nature of the most recent AI systems.
+    Paraphrases source sentence 205 (content-word overlap 91%).
+  s40 (C): This distinction relies on the idea that early AI was dumb, rule-based, and mechanical, while modern deep learning systems operate through vast, complex neural networks that mimic human cognition so closely that they must be granted a form of autonomy.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s41 (R): For example, Jens Christian Bjerring and Jacob Busch state that insofar as AI systems will eventually outperform the best practitioners in specific medical domains, practitioners will have epistemic obligation to rely on these systems in medical decision making.
+    Paraphrases source sentence 211 (content-word overlap 100%).
+  s42 (C): They argue that if a tool works better than a human, we should defer to it.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s43 (C): This is a purely veritistic and functionalist conception of expertise: truth-getting is all that matters, not the agent's character or intentions.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s44 (C): Under this framework, competence is defined narrowly as accuracy.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s45 (C): If an AI outputs correct answers 95% of the time, it is deemed competent, regardless of whether it understands what it is doing.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s47 (R): However, this veritistic conception, although it helps bringing to light some of the necessary characteristics of expertise, suffers from a number of limitations.
+    Paraphrases source sentence 218 (content-word overlap 93%).
+  s48 (C): It ignores the social and institutional dimensions that constitute real-world expertise.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s51 (C): Medical boards license doctors; universities confer degrees on professors; peer-reviewed journals validate research findings.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s52 (R): These institutions provide badges—socially assigned labels—that signal to us that someone possesses an extensive fund of knowledge and a set of skills or methods for apt and successful deployment of this knowledge to new questions in the domain.
+    Paraphrases source sentence 193 (content-word overlap 67%).
+  s54 (R): But beyond this, expertise involves virtues: virtue epistemology emphasizes the possession and exercise by an agent of particular skills or 'epistemic virtues.'
+    Paraphrases source sentence 321 (content-word overlap 50%).
+  s55 (R): Competence, conscientious work, and epistemic self-assessment are aspects of B's 'epistemic character.'
+    Paraphrases source sentence 326 (content-word overlap 56%).
+  s56 (C): A human expert can confess ignorance, admit error, and revise their view in light of new evidence.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s58 (C): It has no capacity for humility, no understanding of what it does not know, and no moral agency to respond to ethical concerns.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s60 (C): But this is a superficial mimicry; it confuses output with process, result with reasoning.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s61 (C): This leads us directly into the heart of the controversy: opacity.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s64 (R): Ross notes that for the vast majority of society, the evidence and reasoning processes of any expert in a specialized field is opaque, a genuine 'black box.'
+    Paraphrases source sentence 98 (content-word overlap 88%).
+  s65 (C): Neuroscientists argue that much of our own thinking occurs unconsciously.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s66 (C): We make decisions without being able to articulate why we made them.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s67 (R): John Zerilli et al. suggest that explaining human actions is all the more tricky because the agents themselves are sometimes unaware of their true motivations or what may have played a role in their reasoning.
+    Paraphrases source sentence 103 (content-word overlap 100%).
+  s68 (R): They write that a large part of human-level opacity stems from the fact that human agents are also frequently mistaken about their real (internal) motivations and processing logic, a fact that is often obscured by the ability of human decision makers to invent post hoc rationalizations.
+    Paraphrases source sentence 104 (content-word overlap 100%).
+  s69 (R): To take one example, Evan Thompson et al. rightly point out that expert Go players 'use their finely honed pattern recognition skills, which they cannot verbalize or formulate in terms of explicit concepts and rules.'
+    Paraphrases source sentence 118 (content-word overlap 92%).
+  s70 (C): Their intuition leads them to brilliant moves, yet they cannot explain the heuristic processes behind those moves.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s71 (C): They operate at a level of cognition that transcends conscious rule-following.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s72 (C): Similarly, AI systems operate beyond human comprehension due to the complexity of their architectures.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s74 (R): As Jonathan Lowe noted, the 'seemingly small step' of turning the reasons for a person's action or decision into the causes of their action or decision is in reality 'an erroneous [step] of enormous magnitude.'
+    Paraphrases source sentence 288 (content-word overlap 74%).
+  s77 (C): Reasons are normative; they justify actions based on values and principles.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s78 (C): Causes are descriptive; they explain events based on prior states and laws.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s79 (C): To say that an AI system has 'reasons' for its decisions is to attribute agency where there is only computation.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s82 (C): For example, a doctor may unconsciously favor patients who resemble them racially or culturally, despite their best intentions.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s83 (C): This bias is not necessarily detectable by the doctor themselves and thus contributes to unjust outcomes.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s84 (C): AI systems can inherit similar biases from their training data, perpetuating discrimination at scale.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s85 (R): Despite this disparity in the varieties of opacity, one conclusion seems to emerge (from these different fronts): that opacity—as a characteristic common to AI systems and human experts—can certainly be apprehended in a uniform manner when trust is granted to humans and when trust is granted to AI systems.
+    Paraphrases source sentence 141 (content-word overlap 92%).
+  s87 (C): But here lies the critical divergence: society does not demand full transparency from human experts.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s88 (C): We trust them precisely because we acknowledge their fallibility and our dependence on their specialized judgment.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s89 (C): We do not hold them hostage to impossible standards of self-explanation that would cripple effective practice.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s90 (C): If we apply this standard to AI systems, we may find ourselves rejecting valuable tools simply because we cannot peer inside their black boxes.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s91 (C): This is a false analogy; it ignores the crucial distinction between human opacity (which involves moral agency and potential for correction) and technical opacity (which often masks systemic flaws or biases that humans can identify and fix).
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s95 (R): Of course, it is debatable to speak of the pro-positional outputs of AI systems as a species of testimony if this type of testimony is precisely devoid of all the necessary properties of testimony.
+    Paraphrases source sentence 244 (content-word overlap 94%).
+  s96 (C): Testimony involves communication between agents who share norms of honesty and accountability.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s97 (C): An AI system does not communicate; it generates outputs based on mathematical functions.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s100 (C): But as we have seen, this comparison collapses under scrutiny because it fails to account for the moral and social dimensions of human expertise.
+    
+  s102 (C): If we treat an AI system as if it were a peer capable of genuine disagreement, we risk abdicating our own intellectual responsibility.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s103 (C): When two peers disagree, they engage in dialogue, challenge each other's reasoning, and seek common ground through argument.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s105 (C): It cannot argue back, nor can it acknowledge the force of counterarguments unless explicitly programmed to simulate such behavior.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s107 (C): The confusion arises because people conflate correlation with causation or reason with mechanism.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s108 (C): They see accurate predictions and assume intelligent agency.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s109 (C): But accuracy does not imply understanding, nor does complexity imply virtue.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s111 (C): Honesty, courage to confront unpopular findings, willingness to update beliefs—all these matter.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s112 (C): We would very much like to think our human experts possess such traits, but we also know from experience that even well-intentioned professionals can be swayed by cognitive biases or institutional pressures.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s113 (C): Yet, we remain willing to trust them because the framework of social epistemology allows for a degree of deference based on institutional credentials rather than perfect rationality.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s114 (R): Extending this model to AI systems requires us to invent entirely new institutions that could certify certain opaque AI technology and approve its use in particular contexts while allowing the technology to remain opaque.
+    Paraphrases source sentence 155 (content-word overlap 50%).
+  s115 (C): Some have proposed such frameworks: imagine a regulatory body auditing algorithmic models for fairness before deployment, issuing certifications akin to medical licenses.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s116 (C): But even with such oversight, the core issue remains: can an uninterpretable model ever be said to possess 'epistemic virtues'?
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s117 (C): If we define expertise strictly in terms of truth-tracking, then perhaps yes.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s118 (C): But if we accept that true expertise also involves responsible judgment, ethical reflection, and adaptive learning—qualities that are inherently human—then AI systems cannot genuinely qualify as experts.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s119 (C): They can assist, they can inform, they can automate routine tasks.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s120 (C): But they cannot stand alone as arbiters of truth or custodians of epistemic values.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s124 (C): But this justification is flawed because it overlooks fundamental differences between human and non-human agents.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s125 (C): Human experts operate within a web of social relationships, institutional accountability, and moral responsibility.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s126 (C): AI systems operate within a framework of computational processes, data patterns, and engineering constraints.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s127 (C): Equating the two is not merely imprecise language; it risks undermining the very foundations of our epistemic practices.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s128 (C): If we extend the model of human expertise to AI, we dilute the meaning of both 'expert' and 'trust.'
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s129 (C): We end up calling machines experts when they lack the essential qualities that make expertise socially valuable: the capacity for growth, the willingness to admit error, the ability to bear responsibility.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s132 (C): It invites us to rely on tools that cannot be held accountable when they fail, and it blinds us to the ways in which these tools might reinforce existing biases under the guise of neutrality.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s133 (C): We must instead develop a separate vocabulary for AI systems—one that acknowledges their utility without exaggerating their autonomy, one that recognizes their opacity as a technical feature rather than an epistemic virtue, and one that preserves our own agency in matters of knowledge and judgment.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s134 (C): In doing so, we can harness the power of artificial intelligence without surrendering the moral and intellectual responsibilities that define us as human beings.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.
+  s135 (C): The future of AI epistemology depends not on pretending that algorithms are peers, but on clearly distinguishing between what they can do—and what they cannot do—in the pursuit of truth and understanding.
+    Content does not trace cleanly to a single source sentence; treated as a compression of multiple.

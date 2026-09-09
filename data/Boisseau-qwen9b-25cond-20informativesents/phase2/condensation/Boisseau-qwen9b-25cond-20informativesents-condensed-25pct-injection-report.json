@@ -1,0 +1,1909 @@
+{
+  "corpus": "Boisseau-qwen9b-25cond-20informativesents",
+  "rate": 25,
+  "spans": [
+    {
+      "span_id": "s1",
+      "type": "T",
+      "text": "Expertise, Opacity, and Trust in AI Systems: A Critique of the Human Analogy",
+      "source_refs": [
+        0
+      ],
+      "justification": "Diverges from source sentence 0 by inserting non-connective content: 'A Critique Human Analogy'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "A",
+        "Critique",
+        "Human",
+        "Analogy"
+      ]
+    },
+    {
+      "span_id": "s3",
+      "type": "C",
+      "text": "Philosophers and sociologists have long examined these dynamics, noting that our reliance on others for knowledge acquisition is a fundamental aspect of human existence.",
+      "source_refs": [
+        77
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s4",
+      "type": "C",
+      "text": "This notion of deference hinges on more general relationships of 'epistemic dependence,' to use John Hardwig's expression, where individuals surrender the full burden of verification to those they deem competent.",
+      "source_refs": [
+        1
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s5",
+      "type": "T",
+      "text": "Traditionally, this dynamic was reserved for human agents:",
+      "source_refs": [
+        8
+      ],
+      "justification": "Diverges from source sentence 8 by inserting non-connective content: 'Traditionally this dynamic was for agents'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "Traditionally",
+        "this",
+        "dynamic",
+        "was",
+        "for",
+        "agents"
+      ]
+    },
+    {
+      "span_id": "s6",
+      "type": "C",
+      "text": "doctors diagnosing illnesses, scientists publishing findings, or legal experts interpreting statutes.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s7",
+      "type": "T",
+      "text": "However, the landscape of our epistemic world is now being radically redefined by the arrival of artificial systems apparently endowed with entirely new cognitive-like capabilities.",
+      "source_refs": [
+        6
+      ],
+      "justification": "Diverges from source sentence 6 by inserting non-connective content: 'However landscape now radically'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "However",
+        "landscape",
+        "now",
+        "radically"
+      ]
+    },
+    {
+      "span_id": "s8",
+      "type": "R",
+      "text": "These programs are proving to be extremely versatile; depending on the data they are 'trained' on, they can carry out tasks—hitherto exclusively reserved to human experts—with a certain degree of autonomy and in a generally highly satisfactory manner.",
+      "source_refs": [
+        8
+      ],
+      "justification": "Paraphrases source sentence 8 (content-word overlap 81%)."
+    },
+    {
+      "span_id": "s9",
+      "type": "C",
+      "text": "This shift forces us to revisit traditional matters about trust, dependence, and expertise.",
+      "source_refs": [
+        6,
+        166,
+        48,
+        79,
+        314,
+        336,
+        353
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s10",
+      "type": "C",
+      "text": "We must ask whether these tools function merely as instruments or if they have become bona fide new experts.",
+      "source_refs": [
+        30,
+        56,
+        91,
+        199
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s11",
+      "type": "T",
+      "text": "Systems involving deep learning are widely used, to mention only some of the cases most frequently discussed in the literature.",
+      "source_refs": [
+        10
+      ],
+      "justification": "Diverges from source sentence 10 by inserting non-connective content: 'discussed'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "discussed"
+      ]
+    },
+    {
+      "span_id": "s12",
+      "type": "C",
+      "text": "In the context of medical diagnosis and imaging, algorithms assist physicians in interpreting scans and identifying pathology with remarkable speed and sometimes accuracy.",
+      "source_refs": [
+        10
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s13",
+      "type": "C",
+      "text": "In policing—within what is sometimes referred to as 'predictive policing'—these systems analyze historical data to predict crime hotspots or assess risk.",
+      "source_refs": [
+        10
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s14",
+      "type": "C",
+      "text": "In banking, finance, and insurance, similar models manage credit risk, detect fraud, and optimize portfolios.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s16",
+      "type": "R",
+      "text": "Opaque systems are furthermore frequently referred to in the literature as epistemic 'black boxes,' insofar as it is virtually impossible to verify or obtain any kind of explanation or justification concerning the production of a particular output.",
+      "source_refs": [
+        21
+      ],
+      "justification": "Paraphrases source sentence 21 (content-word overlap 91%)."
+    },
+    {
+      "span_id": "s17",
+      "type": "R",
+      "text": "The use of such 'opaque' systems naturally poses a number of ethical problems, including embarrassing cases of 'responsibility gaps' and algorithmic biases.",
+      "source_refs": [
+        23
+      ],
+      "justification": "Paraphrases source sentence 23 (content-word overlap 75%)."
+    },
+    {
+      "span_id": "s18",
+      "type": "C",
+      "text": "When an opaque system makes a harmful error, who is responsible?",
+      "source_refs": [
+        83,
+        275,
+        373,
+        385
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s19",
+      "type": "C",
+      "text": "The programmer?",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s21",
+      "type": "T",
+      "text": "The data provider?",
+      "source_refs": [
+        8
+      ],
+      "justification": "Diverges from source sentence 8 by inserting non-connective content: 'provider'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "provider"
+      ]
+    },
+    {
+      "span_id": "s22",
+      "type": "T",
+      "text": "Or the system itself?",
+      "source_refs": [
+        29
+      ],
+      "justification": "Diverges from source sentence 29 by inserting non-connective content: 'Or itself'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "Or",
+        "itself"
+      ]
+    },
+    {
+      "span_id": "s23",
+      "type": "C",
+      "text": "These questions have led to debates regarding the nature of agency and moral responsibility.",
+      "source_refs": [
+        79,
+        210,
+        351,
+        352
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s24",
+      "type": "T",
+      "text": "A somewhat recurrent hypothesis in the literature—sometimes stated explicitly, other times implicitly or underlyingly—is that the trust placed in these opaque systems should be modeled on the type of trust we ordinarily place in human experts.",
+      "source_refs": [
+        26
+      ],
+      "justification": "Diverges from source sentence 26 by inserting non-connective content: 'modeled'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "modeled"
+      ]
+    },
+    {
+      "span_id": "s27",
+      "type": "C",
+      "text": "This analogy rests on two primary pillars: first, the shared characteristic of opacity between human experts and AI systems; second, the functional success of AI systems, which supposedly warrants trust regardless of internal process transparency.",
+      "source_refs": [
+        105,
+        141,
+        188,
+        270,
+        40,
+        77,
+        81,
+        255,
+        358,
+        387,
+        388,
+        389,
+        390
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s28",
+      "type": "T",
+      "text": "To outline this general point, let us first make a few distinctions regarding this notion of trust vis-à-vis artificial systems.",
+      "source_refs": [
+        42
+      ],
+      "justification": "Diverges from source sentence 42 by inserting non-connective content: 'To outline this general point à'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "To",
+        "outline",
+        "this",
+        "general",
+        "point",
+        "à"
+      ]
+    },
+    {
+      "span_id": "s29",
+      "type": "T",
+      "text": "Following the categorization proposed by Rom Harré—recently revisited by Eamon Duede—we can distinguish between physically mediated instruments and theoretically mediated instruments.",
+      "source_refs": [
+        54
+      ],
+      "justification": "Diverges from source sentence 54 by inserting non-connective content: 'categorization proposed Harré'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "categorization",
+        "proposed",
+        "Harré"
+      ]
+    },
+    {
+      "span_id": "s30",
+      "type": "R",
+      "text": "The trust that users place in their GPS is then understood as what Mark Coeckelbergh ultimately describes as a merely predictive trust.",
+      "source_refs": [
+        62
+      ],
+      "justification": "Paraphrases source sentence 62 (content-word overlap 100%)."
+    },
+    {
+      "span_id": "s31",
+      "type": "C",
+      "text": "We rely on the device to function correctly, but we do not necessarily understand or care about its internal workings.",
+      "source_refs": [
+        60,
+        224,
+        233,
+        245,
+        246,
+        47,
+        50,
+        52,
+        61,
+        72,
+        76,
+        100,
+        110,
+        115,
+        127,
+        129,
+        166,
+        181,
+        187,
+        207,
+        223,
+        248,
+        329,
+        371
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s32",
+      "type": "F",
+      "text": "However, trustworthiness is considered to be much more meaningful than mere reliability, and being trustworthy would require the recipient of trust to possess particular moral characteristics.",
+      "source_refs": [
+        68
+      ],
+      "justification": "Diverges from source sentence 68 only by inserting connective(s): 'However'.",
+      "basis": "diff_connective",
+      "diff_text": [
+        "However"
+      ]
+    },
+    {
+      "span_id": "s33",
+      "type": "C",
+      "text": "When we trust a human expert, we are implicitly trusting their virtue: their integrity, their conscientiousness, their commitment to truth.",
+      "source_refs": [
+        85,
+        26,
+        141,
+        150,
+        361,
+        385,
+        390,
+        30,
+        34,
+        37,
+        40,
+        46,
+        62,
+        71,
+        77,
+        79,
+        81,
+        83,
+        88,
+        89,
+        103,
+        104,
+        105,
+        114,
+        146,
+        149,
+        152,
+        168,
+        188,
+        196,
+        240,
+        255,
+        270,
+        278,
+        282,
+        309,
+        316,
+        329,
+        334,
+        366,
+        372,
+        373,
+        388
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s34",
+      "type": "C",
+      "text": "Trust in an instrument is different; it is grounded in past performance and physical mediation rather than epistemic character.",
+      "source_refs": [
+        376,
+        5,
+        29,
+        33,
+        40,
+        53,
+        54,
+        67,
+        68,
+        76,
+        83,
+        85,
+        117,
+        148,
+        222,
+        240,
+        246,
+        268,
+        295,
+        318,
+        352
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s35",
+      "type": "C",
+      "text": "Yet, many proponents of AI as expert argue that deep learning systems have crossed the threshold from mere instruments to genuine epistemic agents.",
+      "source_refs": [
+        204,
+        27,
+        77,
+        83,
+        135,
+        205,
+        211,
+        382,
+        10,
+        29,
+        32,
+        33,
+        39,
+        40,
+        41,
+        91,
+        92,
+        94,
+        105,
+        194,
+        200,
+        206,
+        213,
+        270,
+        331,
+        367
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s36",
+      "type": "T",
+      "text": "They claim that the reliability (the good track record) of these systems therefore makes them entirely honourable candidates to play the role just mentioned of epistemic resource for human agents.",
+      "source_refs": [
+        200
+      ],
+      "justification": "Diverges from source sentence 200 by inserting non-connective content: 'They claim that'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "They",
+        "claim",
+        "that"
+      ]
+    },
+    {
+      "span_id": "s39",
+      "type": "R",
+      "text": "The functioning of expert systems is indeed solely based on a form of 'mere computation, calculation and memory retrieval' in contrast to which Alvarado defines the truly epistemic nature of the most recent AI systems.",
+      "source_refs": [
+        205
+      ],
+      "justification": "Paraphrases source sentence 205 (content-word overlap 91%)."
+    },
+    {
+      "span_id": "s40",
+      "type": "C",
+      "text": "This distinction relies on the idea that early AI was dumb, rule-based, and mechanical, while modern deep learning systems operate through vast, complex neural networks that mimic human cognition so closely that they must be granted a form of autonomy.",
+      "source_refs": [
+        308,
+        77,
+        81,
+        141
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s41",
+      "type": "R",
+      "text": "For example, Jens Christian Bjerring and Jacob Busch state that insofar as AI systems will eventually outperform the best practitioners in specific medical domains, practitioners will have epistemic obligation to rely on these systems in medical decision making.",
+      "source_refs": [
+        211
+      ],
+      "justification": "Paraphrases source sentence 211 (content-word overlap 100%)."
+    },
+    {
+      "span_id": "s42",
+      "type": "C",
+      "text": "They argue that if a tool works better than a human, we should defer to it.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s43",
+      "type": "C",
+      "text": "This is a purely veritistic and functionalist conception of expertise: truth-getting is all that matters, not the agent's character or intentions.",
+      "source_refs": [
+        216,
+        208,
+        36,
+        79,
+        165,
+        190,
+        196,
+        213,
+        220,
+        245,
+        253,
+        328,
+        331,
+        347,
+        392,
+        393
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s44",
+      "type": "C",
+      "text": "Under this framework, competence is defined narrowly as accuracy.",
+      "source_refs": [
+        11,
+        56,
+        78,
+        136,
+        147,
+        170,
+        186,
+        222,
+        322,
+        328,
+        333,
+        335,
+        366
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s45",
+      "type": "C",
+      "text": "If an AI outputs correct answers 95% of the time, it is deemed competent, regardless of whether it understands what it is doing.",
+      "source_refs": [
+        38,
+        128,
+        171,
+        224,
+        240,
+        244,
+        316
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s46",
+      "type": "T",
+      "text": "This allows for artefacts to act as epistemic experts and hence epistemic peers, insofar as they provide broadly correct results.",
+      "source_refs": [
+        216
+      ],
+      "justification": "Diverges from source sentence 216 by inserting non-connective content: 'This allows'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "This",
+        "allows"
+      ]
+    },
+    {
+      "span_id": "s47",
+      "type": "R",
+      "text": "However, this veritistic conception, although it helps bringing to light some of the necessary characteristics of expertise, suffers from a number of limitations.",
+      "source_refs": [
+        218
+      ],
+      "justification": "Paraphrases source sentence 218 (content-word overlap 93%)."
+    },
+    {
+      "span_id": "s48",
+      "type": "C",
+      "text": "It ignores the social and institutional dimensions that constitute real-world expertise.",
+      "source_refs": [
+        95,
+        146,
+        156,
+        165
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s51",
+      "type": "C",
+      "text": "Medical boards license doctors; universities confer degrees on professors; peer-reviewed journals validate research findings.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s52",
+      "type": "R",
+      "text": "These institutions provide badges—socially assigned labels—that signal to us that someone possesses an extensive fund of knowledge and a set of skills or methods for apt and successful deployment of this knowledge to new questions in the domain.",
+      "source_refs": [
+        193
+      ],
+      "justification": "Paraphrases source sentence 193 (content-word overlap 67%)."
+    },
+    {
+      "span_id": "s53",
+      "type": "T",
+      "text": "Goldman defines the expert in a particular field as someone who possesses such knowledge and skills.",
+      "source_refs": [
+        193
+      ],
+      "justification": "Diverges from source sentence 193 by inserting non-connective content: 'such'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "such"
+      ]
+    },
+    {
+      "span_id": "s54",
+      "type": "R",
+      "text": "But beyond this, expertise involves virtues: virtue epistemology emphasizes the possession and exercise by an agent of particular skills or 'epistemic virtues.'",
+      "source_refs": [
+        321
+      ],
+      "justification": "Paraphrases source sentence 321 (content-word overlap 50%)."
+    },
+    {
+      "span_id": "s55",
+      "type": "R",
+      "text": "Competence, conscientious work, and epistemic self-assessment are aspects of B's 'epistemic character.'",
+      "source_refs": [
+        326
+      ],
+      "justification": "Paraphrases source sentence 326 (content-word overlap 56%)."
+    },
+    {
+      "span_id": "s56",
+      "type": "C",
+      "text": "A human expert can confess ignorance, admit error, and revise their view in light of new evidence.",
+      "source_refs": [
+        255,
+        270,
+        282,
+        11,
+        30,
+        31,
+        32,
+        83,
+        85,
+        98,
+        103,
+        104,
+        105,
+        114,
+        115,
+        118,
+        133,
+        142,
+        170,
+        193,
+        196,
+        198,
+        204,
+        218,
+        239,
+        243,
+        257,
+        258,
+        268,
+        278,
+        283,
+        316,
+        329,
+        334,
+        355,
+        361,
+        373,
+        382,
+        385,
+        388
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s58",
+      "type": "C",
+      "text": "It has no capacity for humility, no understanding of what it does not know, and no moral agency to respond to ethical concerns.",
+      "source_refs": [
+        182,
+        337,
+        60,
+        74,
+        77,
+        79,
+        114,
+        115,
+        129,
+        131,
+        180,
+        208,
+        216,
+        229,
+        231,
+        254,
+        258,
+        262,
+        270,
+        294,
+        298,
+        334,
+        352,
+        357,
+        373,
+        390
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s60",
+      "type": "C",
+      "text": "But this is a superficial mimicry; it confuses output with process, result with reasoning.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s61",
+      "type": "C",
+      "text": "This leads us directly into the heart of the controversy: opacity.",
+      "source_refs": [
+        252
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s64",
+      "type": "R",
+      "text": "Ross notes that for the vast majority of society, the evidence and reasoning processes of any expert in a specialized field is opaque, a genuine 'black box.'",
+      "source_refs": [
+        98
+      ],
+      "justification": "Paraphrases source sentence 98 (content-word overlap 88%)."
+    },
+    {
+      "span_id": "s65",
+      "type": "C",
+      "text": "Neuroscientists argue that much of our own thinking occurs unconsciously.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s66",
+      "type": "C",
+      "text": "We make decisions without being able to articulate why we made them.",
+      "source_refs": [
+        308,
+        29,
+        87,
+        105,
+        154,
+        299,
+        315,
+        351
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s67",
+      "type": "R",
+      "text": "John Zerilli et al. suggest that explaining human actions is all the more tricky because the agents themselves are sometimes unaware of their true motivations or what may have played a role in their reasoning.",
+      "source_refs": [
+        103
+      ],
+      "justification": "Paraphrases source sentence 103 (content-word overlap 100%)."
+    },
+    {
+      "span_id": "s68",
+      "type": "R",
+      "text": "They write that a large part of human-level opacity stems from the fact that human agents are also frequently mistaken about their real (internal) motivations and processing logic, a fact that is often obscured by the ability of human decision makers to invent post hoc rationalizations.",
+      "source_refs": [
+        104
+      ],
+      "justification": "Paraphrases source sentence 104 (content-word overlap 100%)."
+    },
+    {
+      "span_id": "s69",
+      "type": "R",
+      "text": "To take one example, Evan Thompson et al. rightly point out that expert Go players 'use their finely honed pattern recognition skills, which they cannot verbalize or formulate in terms of explicit concepts and rules.'",
+      "source_refs": [
+        118
+      ],
+      "justification": "Paraphrases source sentence 118 (content-word overlap 92%)."
+    },
+    {
+      "span_id": "s70",
+      "type": "C",
+      "text": "Their intuition leads them to brilliant moves, yet they cannot explain the heuristic processes behind those moves.",
+      "source_refs": [
+        99,
+        282,
+        114,
+        118,
+        258,
+        295,
+        306,
+        330,
+        361,
+        367
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s71",
+      "type": "C",
+      "text": "They operate at a level of cognition that transcends conscious rule-following.",
+      "source_refs": [
+        102,
+        204,
+        284,
+        390
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s72",
+      "type": "C",
+      "text": "Similarly, AI systems operate beyond human comprehension due to the complexity of their architectures.",
+      "source_refs": [
+        270,
+        316,
+        385,
+        38,
+        39,
+        40,
+        77,
+        81,
+        83,
+        91,
+        141,
+        152,
+        200,
+        204,
+        255,
+        280,
+        361,
+        387,
+        0,
+        11,
+        26,
+        30,
+        34,
+        37,
+        89,
+        94,
+        103,
+        104,
+        105,
+        125,
+        135,
+        138,
+        155,
+        171,
+        198,
+        199,
+        205,
+        210,
+        211,
+        213,
+        218,
+        228,
+        240,
+        244,
+        247,
+        248,
+        273,
+        282,
+        347,
+        353,
+        373,
+        382,
+        389,
+        390
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s73",
+      "type": "F",
+      "text": "Yet, there is a temptation to equate these two types of opacity: the opacity concerning the reasoning followed by the human expert (manifested by their inability to explain their decision) would be directly correlated with the opacity concerning the unintelligibility of the neuronal processes in their brain.",
+      "source_refs": [
+        282
+      ],
+      "justification": "Diverges from source sentence 282 only by inserting connective(s): 'Yet'.",
+      "basis": "diff_connective",
+      "diff_text": [
+        "Yet"
+      ]
+    },
+    {
+      "span_id": "s74",
+      "type": "R",
+      "text": "As Jonathan Lowe noted, the 'seemingly small step' of turning the reasons for a person's action or decision into the causes of their action or decision is in reality 'an erroneous [step] of enormous magnitude.'",
+      "source_refs": [
+        288
+      ],
+      "justification": "Paraphrases source sentence 288 (content-word overlap 74%)."
+    },
+    {
+      "span_id": "s77",
+      "type": "C",
+      "text": "Reasons are normative; they justify actions based on values and principles.",
+      "source_refs": [
+        268,
+        271,
+        285,
+        316,
+        318,
+        334,
+        352
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s78",
+      "type": "C",
+      "text": "Causes are descriptive; they explain events based on prior states and laws.",
+      "source_refs": [
+        285,
+        304,
+        306,
+        308
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s79",
+      "type": "C",
+      "text": "To say that an AI system has 'reasons' for its decisions is to attribute agency where there is only computation.",
+      "source_refs": [
+        255,
+        270,
+        316,
+        29,
+        105,
+        177,
+        284,
+        370,
+        30,
+        74,
+        77,
+        83,
+        89,
+        116,
+        134,
+        135,
+        153,
+        154,
+        171,
+        173,
+        245,
+        252,
+        254,
+        315,
+        342,
+        343,
+        357,
+        373,
+        376,
+        382
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s82",
+      "type": "C",
+      "text": "For example, a doctor may unconsciously favor patients who resemble them racially or culturally, despite their best intentions.",
+      "source_refs": [
+        118,
+        125,
+        211,
+        295,
+        330,
+        361,
+        367
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s83",
+      "type": "C",
+      "text": "This bias is not necessarily detectable by the doctor themselves and thus contributes to unjust outcomes.",
+      "source_refs": [
+        110,
+        115,
+        127,
+        165,
+        187,
+        223,
+        264,
+        329,
+        344
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s84",
+      "type": "C",
+      "text": "AI systems can inherit similar biases from their training data, perpetuating discrimination at scale.",
+      "source_refs": [
+        204,
+        135,
+        152,
+        270,
+        316,
+        385,
+        0,
+        23,
+        27,
+        38,
+        39,
+        40,
+        77,
+        81,
+        83,
+        89,
+        91,
+        92,
+        94,
+        126,
+        141,
+        171,
+        200,
+        205,
+        210,
+        211,
+        228,
+        244,
+        248,
+        255,
+        273,
+        280,
+        347,
+        361,
+        387,
+        390
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s85",
+      "type": "R",
+      "text": "Despite this disparity in the varieties of opacity, one conclusion seems to emerge (from these different fronts): that opacity—as a characteristic common to AI systems and human experts—can certainly be apprehended in a uniform manner when trust is granted to humans and when trust is granted to AI systems.",
+      "source_refs": [
+        141
+      ],
+      "justification": "Paraphrases source sentence 141 (content-word overlap 92%)."
+    },
+    {
+      "span_id": "s87",
+      "type": "C",
+      "text": "But here lies the critical divergence: society does not demand full transparency from human experts.",
+      "source_refs": [
+        131,
+        198,
+        208,
+        390,
+        11,
+        26,
+        37,
+        60,
+        77,
+        79,
+        81,
+        88,
+        91,
+        98,
+        142,
+        149,
+        155,
+        180,
+        182,
+        199,
+        216,
+        245,
+        262,
+        280,
+        294,
+        298,
+        308,
+        337,
+        357
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s88",
+      "type": "C",
+      "text": "We trust them precisely because we acknowledge their fallibility and our dependence on their specialized judgment.",
+      "source_refs": [
+        152,
+        361,
+        0,
+        46,
+        62,
+        69,
+        72,
+        103,
+        149,
+        150,
+        168,
+        196,
+        230,
+        255,
+        278,
+        291,
+        295,
+        296,
+        329,
+        330,
+        346,
+        367
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s89",
+      "type": "C",
+      "text": "We do not hold them hostage to impossible standards of self-explanation that would cripple effective practice.",
+      "source_refs": [
+        69,
+        72,
+        100,
+        129,
+        181,
+        207,
+        230,
+        233,
+        245,
+        246,
+        248,
+        295,
+        371
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s90",
+      "type": "C",
+      "text": "If we apply this standard to AI systems, we may find ourselves rejecting valuable tools simply because we cannot peer inside their black boxes.",
+      "source_refs": [
+        385,
+        83,
+        152,
+        376,
+        382
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s91",
+      "type": "C",
+      "text": "This is a false analogy; it ignores the crucial distinction between human opacity (which involves moral agency and potential for correction) and technical opacity (which often masks systemic flaws or biases that humans can identify and fix).",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s95",
+      "type": "R",
+      "text": "Of course, it is debatable to speak of the pro-positional outputs of AI systems as a species of testimony if this type of testimony is precisely devoid of all the necessary properties of testimony.",
+      "source_refs": [
+        244
+      ],
+      "justification": "Paraphrases source sentence 244 (content-word overlap 94%)."
+    },
+    {
+      "span_id": "s96",
+      "type": "C",
+      "text": "Testimony involves communication between agents who share norms of honesty and accountability.",
+      "source_refs": [
+        77,
+        138
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s97",
+      "type": "C",
+      "text": "An AI system does not communicate; it generates outputs based on mathematical functions.",
+      "source_refs": [
+        357,
+        342,
+        390,
+        29,
+        30,
+        60,
+        73,
+        74,
+        77,
+        83,
+        105,
+        117,
+        128,
+        131,
+        173,
+        177,
+        180,
+        182,
+        187,
+        205,
+        208,
+        216,
+        221,
+        244,
+        245,
+        248,
+        255,
+        262,
+        270,
+        275,
+        281,
+        284,
+        294,
+        298,
+        316,
+        337,
+        343,
+        370,
+        376,
+        377,
+        382
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s98",
+      "type": "T",
+      "text": "Calling its output 'testimony' is category error.",
+      "source_refs": [
+        31
+      ],
+      "justification": "Diverges from source sentence 31 by inserting non-connective content: 'Calling its testimony is category error'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "Calling",
+        "its",
+        "testimony",
+        "is",
+        "category",
+        "error"
+      ]
+    },
+    {
+      "span_id": "s99",
+      "type": "T",
+      "text": "This remark is obviously in keeping with the trend in the literature identified and discussed here, which attempts to compare the opacity of AI systems with the opacity of human experts.",
+      "source_refs": [
+        280
+      ],
+      "justification": "Diverges from source sentence 280 by inserting non-connective content: 'discussed'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "discussed"
+      ]
+    },
+    {
+      "span_id": "s100",
+      "type": "C",
+      "text": "But as we have seen, this comparison collapses under scrutiny because it fails to account for the moral and social dimensions of human expertise.",
+      "source_refs": [],
+      "justification": "",
+      "basis": "phrase_match",
+      "candidate_source_ref": 103,
+      "candidate_overlap": 0.2143,
+      "candidate_diff_text": [
+        "But",
+        "as",
+        "we",
+        "have",
+        "seen",
+        "this",
+        "comparison",
+        "collapses",
+        "under",
+        "scrutiny",
+        "because",
+        "it",
+        "fails",
+        "to",
+        "account",
+        "for",
+        "the",
+        "moral",
+        "and",
+        "social",
+        "dimensions",
+        "of",
+        "expertise"
+      ]
+    },
+    {
+      "span_id": "s101",
+      "type": "T",
+      "text": "Consider a decision support system as an expert can lead human experts to grant too great a form of agency to the machine, insofar as the latter is in no way competent in the sense that interests us when we speak of expertise—that is, a sense that goes beyond the simple veritistic framework.",
+      "source_refs": [
+        373
+      ],
+      "justification": "Diverges from source sentence 373 by inserting non-connective content: 'Consider that is'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "Consider",
+        "that",
+        "is"
+      ]
+    },
+    {
+      "span_id": "s102",
+      "type": "C",
+      "text": "If we treat an AI system as if it were a peer capable of genuine disagreement, we risk abdicating our own intellectual responsibility.",
+      "source_refs": [
+        376,
+        382,
+        5,
+        29,
+        30,
+        31,
+        39,
+        83,
+        105,
+        173,
+        177,
+        240,
+        255,
+        270,
+        284,
+        342,
+        343,
+        357,
+        359,
+        361,
+        370
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s103",
+      "type": "C",
+      "text": "When two peers disagree, they engage in dialogue, challenge each other's reasoning, and seek common ground through argument.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s104",
+      "type": "T",
+      "text": "An AI system cannot do this.",
+      "source_refs": [
+        370
+      ],
+      "justification": "Diverges from source sentence 370 by inserting non-connective content: 'can not this'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "can",
+        "not",
+        "this"
+      ]
+    },
+    {
+      "span_id": "s105",
+      "type": "C",
+      "text": "It cannot argue back, nor can it acknowledge the force of counterarguments unless explicitly programmed to simulate such behavior.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s106",
+      "type": "T",
+      "text": "Even then, simulation is not real engagement.",
+      "source_refs": [
+        100
+      ],
+      "justification": "Diverges from source sentence 100 by inserting non-connective content: 'then simulation real engagement'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "then",
+        "simulation",
+        "real",
+        "engagement"
+      ]
+    },
+    {
+      "span_id": "s107",
+      "type": "C",
+      "text": "The confusion arises because people conflate correlation with causation or reason with mechanism.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s108",
+      "type": "C",
+      "text": "They see accurate predictions and assume intelligent agency.",
+      "source_refs": [
+        35,
+        69,
+        199,
+        248,
+        275,
+        314,
+        315
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s109",
+      "type": "C",
+      "text": "But accuracy does not imply understanding, nor does complexity imply virtue.",
+      "source_refs": [
+        60,
+        131,
+        180,
+        182,
+        208,
+        216,
+        253,
+        262,
+        294,
+        298,
+        337,
+        357,
+        390
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s111",
+      "type": "C",
+      "text": "Honesty, courage to confront unpopular findings, willingness to update beliefs—all these matter.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s112",
+      "type": "C",
+      "text": "We would very much like to think our human experts possess such traits, but we also know from experience that even well-intentioned professionals can be swayed by cognitive biases or institutional pressures.",
+      "source_refs": [
+        146,
+        11,
+        153,
+        179,
+        188,
+        213,
+        271,
+        330,
+        361
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s113",
+      "type": "C",
+      "text": "Yet, we remain willing to trust them because the framework of social epistemology allows for a degree of deference based on institutional credentials rather than perfect rationality.",
+      "source_refs": [
+        0,
+        117,
+        146,
+        318
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s114",
+      "type": "R",
+      "text": "Extending this model to AI systems requires us to invent entirely new institutions that could certify certain opaque AI technology and approve its use in particular contexts while allowing the technology to remain opaque.",
+      "source_refs": [
+        155
+      ],
+      "justification": "Paraphrases source sentence 155 (content-word overlap 50%)."
+    },
+    {
+      "span_id": "s115",
+      "type": "C",
+      "text": "Some have proposed such frameworks: imagine a regulatory body auditing algorithmic models for fairness before deployment, issuing certifications akin to medical licenses.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s116",
+      "type": "C",
+      "text": "But even with such oversight, the core issue remains: can an uninterpretable model ever be said to possess 'epistemic virtues'?",
+      "source_refs": [
+        159,
+        383,
+        384
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s117",
+      "type": "C",
+      "text": "If we define expertise strictly in terms of truth-tracking, then perhaps yes.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s118",
+      "type": "C",
+      "text": "But if we accept that true expertise also involves responsible judgment, ethical reflection, and adaptive learning—qualities that are inherently human—then AI systems cannot genuinely qualify as experts.",
+      "source_refs": [
+        38,
+        81,
+        39,
+        91,
+        94,
+        210,
+        250,
+        280,
+        382
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s119",
+      "type": "C",
+      "text": "They can assist, they can inform, they can automate routine tasks.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s120",
+      "type": "C",
+      "text": "But they cannot stand alone as arbiters of truth or custodians of epistemic values.",
+      "source_refs": [
+        382
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s121",
+      "type": "T",
+      "text": "In conclusion, my aim in this paper was to assess how far the analogy holds between the trust a layperson places in an expert and the trust—that whether from a layperson or an expert—that a human being places in a deep learning-based artificial system.",
+      "source_refs": [],
+      "justification": "",
+      "basis": "phrase_match",
+      "candidate_source_ref": 388,
+      "candidate_overlap": 0.8571,
+      "candidate_diff_text": [
+        "In",
+        "that"
+      ]
+    },
+    {
+      "span_id": "s124",
+      "type": "C",
+      "text": "But this justification is flawed because it overlooks fundamental differences between human and non-human agents.",
+      "source_refs": [
+        270,
+        32,
+        53,
+        77,
+        103,
+        105,
+        138,
+        188,
+        218,
+        240,
+        308,
+        355,
+        387,
+        388
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s125",
+      "type": "C",
+      "text": "Human experts operate within a web of social relationships, institutional accountability, and moral responsibility.",
+      "source_refs": [
+        146,
+        153,
+        361,
+        0,
+        11,
+        31,
+        39,
+        40,
+        79,
+        89,
+        98,
+        141,
+        156,
+        188,
+        195,
+        213,
+        218,
+        255,
+        334,
+        353,
+        373,
+        389
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s126",
+      "type": "C",
+      "text": "AI systems operate within a framework of computational processes, data patterns, and engineering constraints.",
+      "source_refs": [
+        0,
+        9,
+        10,
+        38,
+        39,
+        40,
+        77,
+        81,
+        83,
+        91,
+        94,
+        135,
+        141,
+        152,
+        171,
+        200,
+        204,
+        205,
+        210,
+        211,
+        228,
+        244,
+        248,
+        270,
+        273,
+        280,
+        316,
+        385,
+        387
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s127",
+      "type": "C",
+      "text": "Equating the two is not merely imprecise language; it risks undermining the very foundations of our epistemic practices.",
+      "source_refs": [
+        246,
+        11,
+        31,
+        41,
+        54,
+        60,
+        79,
+        85,
+        94,
+        114,
+        131,
+        165,
+        166,
+        195,
+        207,
+        215,
+        216
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s128",
+      "type": "C",
+      "text": "If we extend the model of human expertise to AI, we dilute the meaning of both 'expert' and 'trust.'",
+      "source_refs": [
+        34,
+        37,
+        38,
+        81,
+        92,
+        96,
+        98,
+        146,
+        156,
+        198,
+        208,
+        361,
+        373,
+        385,
+        389
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s129",
+      "type": "C",
+      "text": "We end up calling machines experts when they lack the essential qualities that make expertise socially valuable: the capacity for growth, the willingness to admit error, the ability to bear responsibility.",
+      "source_refs": [
+        334
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s130",
+      "type": "F",
+      "text": "The fourth section of the paper will show the limits of this conception of expertise, and will argue against conceptualizing trust in artificial systems on the model of trust in human experts.",
+      "source_refs": [],
+      "justification": "",
+      "basis": "phrase_match",
+      "candidate_source_ref": 37,
+      "candidate_overlap": 0.9375,
+      "candidate_diff_text": [
+        "conceptualizing"
+      ]
+    },
+    {
+      "span_id": "s131",
+      "type": "T",
+      "text": "Therefore, modeling the trust we place in AI systems on the trust we place in human experts is a misguided (and potentially epistemically dangerous) attitude.",
+      "source_refs": [
+        40
+      ],
+      "justification": "Diverges from source sentence 40 by inserting non-connective content: 'modeling epistemically'.",
+      "basis": "diff_lexical",
+      "diff_text": [
+        "modeling",
+        "epistemically"
+      ]
+    },
+    {
+      "span_id": "s132",
+      "type": "C",
+      "text": "It invites us to rely on tools that cannot be held accountable when they fail, and it blinds us to the ways in which these tools might reinforce existing biases under the guise of neutrality.",
+      "source_refs": [],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s133",
+      "type": "C",
+      "text": "We must instead develop a separate vocabulary for AI systems—one that acknowledges their utility without exaggerating their autonomy, one that recognizes their opacity as a technical feature rather than an epistemic virtue, and one that preserves our own agency in matters of knowledge and judgment.",
+      "source_refs": [
+        376
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s134",
+      "type": "C",
+      "text": "In doing so, we can harness the power of artificial intelligence without surrendering the moral and intellectual responsibilities that define us as human beings.",
+      "source_refs": [
+        353,
+        153,
+        308,
+        318,
+        352,
+        30,
+        32,
+        34,
+        37,
+        42,
+        48,
+        105,
+        138,
+        145,
+        170,
+        187,
+        188,
+        199,
+        208,
+        218,
+        239,
+        240,
+        245,
+        247,
+        256,
+        284,
+        334,
+        351,
+        355,
+        361,
+        373,
+        382,
+        388
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    },
+    {
+      "span_id": "s135",
+      "type": "C",
+      "text": "The future of AI epistemology depends not on pretending that algorithms are peers, but on clearly distinguishing between what they can do—and what they cannot do—in the pursuit of truth and understanding.",
+      "source_refs": [
+        77,
+        314,
+        357
+      ],
+      "justification": "Content does not trace cleanly to a single source sentence; treated as a compression of multiple."
+    }
+  ],
+  "borderline_flags": [
+    {
+      "span_id": "s100",
+      "type": "T",
+      "text": "But as we have seen, this comparison collapses under scrutiny because it fails to account for the moral and social dimensions of human expertise.",
+      "source_refs": [
+        103
+      ],
+      "source_is_candidate_only": true,
+      "reason": "14 content-bearing tokens -- unusually high for a metalinguistic span; may carry object-level content that belongs in R or C instead"
+    },
+    {
+      "span_id": "s130",
+      "type": "T",
+      "text": "The fourth section of the paper will show the limits of this conception of expertise, and will argue against conceptualizing trust in artificial systems on the model of trust in human experts.",
+      "source_refs": [
+        37
+      ],
+      "source_is_candidate_only": true,
+      "reason": "Nearly identical to its closest candidate source sentence (94% content-word overlap) -- diverges by 1 content-bearing token(s): 'conceptualizing'. Called metalinguistic, but this close to a real source sentence it may carry object-level content that belongs in R or C instead."
+    }
+  ],
+  "coverage": {
+    "action": {
+      "target": 3.6,
+      "actual": 1.8,
+      "delta": -1.8,
+      "status": "OK"
+    },
+    "agent": {
+      "target": 3.6,
+      "actual": 2.2,
+      "delta": -1.4,
+      "status": "OK"
+    },
+    "character": {
+      "target": 14.4,
+      "actual": 18.1,
+      "delta": 3.7,
+      "status": "OK"
+    },
+    "epistemic": {
+      "target": 12.9,
+      "actual": 13.3,
+      "delta": 0.4,
+      "status": "OK"
+    },
+    "epistemic AI": {
+      "target": 4.2,
+      "actual": 2.8,
+      "delta": -1.4,
+      "status": "OK"
+    },
+    "expectation": {
+      "target": 2.9,
+      "actual": 1.4,
+      "delta": -1.5,
+      "status": "OK"
+    },
+    "expertise": {
+      "target": 3.7,
+      "actual": 2.2,
+      "delta": -1.5,
+      "status": "OK"
+    },
+    "human": {
+      "target": 11.3,
+      "actual": 15.7,
+      "delta": 4.4,
+      "status": "OK"
+    },
+    "moral": {
+      "target": 4.7,
+      "actual": 3.4,
+      "delta": -1.3,
+      "status": "OK"
+    },
+    "systems": {
+      "target": 19.4,
+      "actual": 19.5,
+      "delta": 0.1,
+      "status": "OK"
+    },
+    "trust": {
+      "target": 19.4,
+      "actual": 19.7,
+      "delta": 0.3,
+      "status": "OK"
+    }
+  },
+  "stats": {
+    "non_injected_pct": 22.0,
+    "verbatim_overlap_pct": 54.7,
+    "verbatim_matched_tokens": 1714,
+    "verbatim_total_tokens": 3133
+  }
+}

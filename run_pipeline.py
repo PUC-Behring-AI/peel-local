@@ -32,7 +32,7 @@ from nltk.stem import PorterStemmer
 
 from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import standalone_report, file_convert
+from common import standalone_report, file_convert, parameter_sweep, resume
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
@@ -43,19 +43,66 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--corpus", required=True, help="Corpus name -- used for data/<corpus>/ paths")
-    parser.add_argument("--input", required=True,
-                         help="Path to the raw corpus file (.txt, .md/.markdown, or .pdf)")
+    parser.add_argument("--corpus", help="Corpus name -- used for data/<corpus>/ paths. "
+                                          "Required unless --list-corpora.")
+    parser.add_argument("--input",
+                         help="Path to the raw corpus file (.txt, .md/.markdown, or .pdf). "
+                              "Required when --start-phase is 1 (the default); must be omitted "
+                              "otherwise, since resuming reuses the corpus's already-saved raw text.")
     parser.add_argument("--clean", action="store_true",
-                         help="Run Phase 0 cleaning (phase0/clean_corpus.py) before Phase 1")
+                         help="Run Phase 0 cleaning (phase0/clean_corpus.py) before Phase 1. "
+                              "Only meaningful with --start-phase 1.")
+    parser.add_argument("--start-phase", type=int, choices=[1, 2, 3], default=1,
+                         help="Which phase to start at (default 1). "
+                              "1: a new corpus -- needs --input, runs Phase 1 -> 2 -> 3. "
+                              "2: resume an existing --corpus at Phase 2, reusing its saved raw "
+                              "text and Phase 1 state (needs data/<corpus>/raw/<corpus>.txt and "
+                              "<corpus>-phase1_state.json already present) -- runs Phase 2 -> 3. "
+                              "3: resume an existing --corpus at Phase 3 only, reusing its saved "
+                              "raw text, Phase 1 state, and at least one already-generated "
+                              "condensed rate -- does not regenerate condensations, just re-runs "
+                              "the distant-reading report. Checked with resume.check_prerequisites "
+                              "before anything runs; a missing file aborts with a clear message "
+                              "instead of starting the desired phase.")
+    parser.add_argument("--list-corpora", action="store_true",
+                         help="List every corpus under data/ and which --start-phase values it "
+                              "currently satisfies the prerequisites for, then exit without "
+                              "running anything.")
 
     # Phase 1 config -- same defaults as phase1.ipynb's config cell
-    parser.add_argument("--top-percentile", type=float, default=0.50)
+    parser.add_argument("--frequency-percentile", type=float, default=0.50,
+                         help="Statistical percentile CUTOFF on the stem-frequency ranking (0-1). "
+                              "Higher = a stricter bar = FEWER, more frequent stems kept -- e.g. "
+                              "0.75 keeps only the top 25%% most-frequent stems, matching the usual "
+                              "sense of a percentile cutoff (like '90th percentile' meaning 'top 10%%').")
     parser.add_argument("--max-stems", type=int, default=150)
+    parser.add_argument("--word-frequency-percentile", type=float, default=0.0,
+                         help="Statistical percentile CUTOFF on each stem's OWN derived-word "
+                              "frequency ranking (0-1; default 0 keeps every derived word, "
+                              "identical to not filtering). Higher = fewer, more frequent derived "
+                              "words considered per stem (e.g. 0.75 keeps only the top 25%% "
+                              "most-frequent words derived from each stem) -- trims how many "
+                              "distinct words (like \"observation\"/\"observes\"/\"observed\" all "
+                              "under stem \"observ\") reach GlossBERT/flagged-term review. Always "
+                              "keeps at least one word per stem.")
+    parser.add_argument("--sweep", action="store_true",
+                         help="Before extracting stems, interactively sweep several "
+                              "candidate --frequency-percentile values (reporting each "
+                              "candidate's true stem count -- uncapped by --max-stems -- "
+                              "distinct derived words, sentence coverage, and "
+                              "informative-sentence counts) and pick one -- overrides "
+                              "--frequency-percentile/--max-stems. The distinct-word and "
+                              "sentence counts already reflect --word-frequency-percentile "
+                              "if that's set.")
     parser.add_argument("--max-sentences-per-stem", type=int, default=5)
     parser.add_argument("--max-synsets", type=int, default=5,
                          help="Ceiling, not a guarantee -- candidates shown per flagged word are also "
                               "capped by how many senses WordNet actually has for that word's part of speech.")
+    parser.add_argument("--merge-duplicate-word-occurrences", action="store_true",
+                         help="Merge all sampled occurrences of the same lexical word into one "
+                              "combined context and run GlossBERT once per word instead of once "
+                              "per occurrence -- avoids the same word being flagged for review "
+                              "more than once when its occurrences land on different senses.")
     parser.add_argument("--max-cluster-size", type=int, default=10)
     parser.add_argument("--min-clusters", type=int, default=5)
     parser.add_argument("--min-cluster-len", type=int, default=3)
@@ -72,6 +119,9 @@ def parse_args():
     # (condense.run_condensation_setup).
     parser.add_argument("--rates", help="Comma-separated condensation rate(s), e.g. '10,20'.")
     parser.add_argument("--ollama-model", help="Ollama model name.")
+    parser.add_argument("--adversarial-model",
+                         help="Ollama model for the post-generation adversarial reviewer. "
+                              "Defaults to --ollama-model if omitted.")
     parser.add_argument("--max-trials", type=int, help="Max generation trials per rate before escalation.")
 
     return parser.parse_args()
@@ -107,9 +157,11 @@ def resolve_condensation_config(args, decisions):
     the command line (still logged, marked "source": "cli" so the
     decision log stays a complete record regardless of run mode);
     otherwise falls back to the same interactive prompts phase2.ipynb
-    uses."""
+    uses. --adversarial-model is optional even in CLI-flags mode --
+    defaults to --ollama-model when omitted."""
     if args.rates and args.ollama_model and args.max_trials:
         rates = [int(r.strip()) for r in args.rates.split(",") if r.strip()]
+        adversarial_model = args.adversarial_model or args.ollama_model
 
         decisions.record(
             step="condensation_setup", decision_type="rate_selection",
@@ -122,6 +174,11 @@ def resolve_condensation_config(args, decisions):
             choice=args.ollama_model, extra={"source": "cli"},
         )
         decisions.record(
+            step="condensation_setup", decision_type="adversarial_model_choice",
+            prompt="Which Ollama model should the adversarial reviewer use?",
+            choice=adversarial_model, extra={"source": "cli"},
+        )
+        decisions.record(
             step="condensation_setup", decision_type="max_trials_choice",
             prompt="How many generation trials before asking to escalate?",
             choice=str(args.max_trials), extra={"source": "cli"},
@@ -129,9 +186,10 @@ def resolve_condensation_config(args, decisions):
 
         print(
             f"\nWill generate condensations at {rates}% using '{args.ollama_model}', "
-            f"up to {args.max_trials} trial(s) each before escalation."
+            f"up to {args.max_trials} trial(s) each before escalation. Adversarial "
+            f"reviewer: '{adversarial_model}'."
         )
-        return rates, args.ollama_model, args.max_trials
+        return rates, args.ollama_model, args.max_trials, adversarial_model
 
     return condense.run_condensation_setup(decisions)
 
@@ -149,8 +207,16 @@ def run_phase1(args, paths, decisions):
 
     doc = nlp(text)
 
-    top_stems = phase1_pipeline.extract_top_stems(doc, stemmer, args.top_percentile, args.max_stems)
-    print(f"\nSelected {len(top_stems)} top stems\n")
+    frequency_percentile, max_stems = args.frequency_percentile, args.max_stems
+    if args.sweep:
+        frequency_percentile, max_stems = parameter_sweep.run_parameter_sweep_setup(
+            doc, text, nlp, stemmer, max_stems, decisions,
+            word_frequency_percentile=args.word_frequency_percentile,
+        )
+
+    top_stems = phase1_pipeline.extract_top_stems(doc, stemmer, frequency_percentile, max_stems)
+    cap_note = phase1_pipeline.describe_stem_cap(top_stems, doc, stemmer, frequency_percentile, max_stems)
+    print(f"\nSelected {len(top_stems)} top stems" + (f" {cap_note}" if cap_note else "") + "\n")
     for stem, count in top_stems.items():
         print(f"{stem}: {count}")
 
@@ -166,17 +232,46 @@ def run_phase1(args, paths, decisions):
 
     print("\nMapping stem occurrences...")
     stem_occurrences = phase1_pipeline.map_stems_to_sentences(doc, top_stems, stemmer)
+    if args.word_frequency_percentile > 0:
+        stem_occurrences = phase1_pipeline.filter_stem_occurrences_by_word_frequency(
+            stem_occurrences, args.word_frequency_percentile,
+        )
+        print(f"Filtered derived words to word_frequency_percentile={args.word_frequency_percentile}")
+
+    phase1_pipeline.log_phase1_config(decisions, {
+        "frequency_percentile": frequency_percentile,
+        "max_stems": max_stems,
+        "word_frequency_percentile": args.word_frequency_percentile,
+        "max_sentences_per_stem": args.max_sentences_per_stem,
+        "max_synsets": args.max_synsets,
+        "merge_duplicate_word_occurrences": args.merge_duplicate_word_occurrences,
+        "max_cluster_size": args.max_cluster_size,
+        "min_clusters": args.min_clusters,
+        "min_cluster_len": args.min_cluster_len,
+        "glossbert_model": args.glossbert_model,
+        "lang_model": args.lang_model,
+        "sentence_embedder": args.sentence_embedder,
+    }, source="cli")
 
     print("\nRunning GlossBERT analysis...")
     accepted_definitions, flagged_words = phase1_pipeline.run_glossbert_analysis(
         top_stems, stem_occurrences, tokenizer, model, device,
         max_sentences_per_stem=args.max_sentences_per_stem, max_synsets=args.max_synsets,
+        merge_duplicate_word_occurrences=args.merge_duplicate_word_occurrences,
     )
     phase1_pipeline.print_accepted_definitions(accepted_definitions)
     phase1_pipeline.print_flagged_words(flagged_words)
-    print("\nDone.")
+    print(f"\nDone. {len(flagged_words)} flagged term(s) need review.")
+    excluded_note = phase1_pipeline.describe_wordnet_excluded_stems(
+        stem_occurrences, max_sentences_per_stem=args.max_sentences_per_stem,
+        merge_duplicate_word_occurrences=args.merge_duplicate_word_occurrences,
+    )
+    if excluded_note:
+        print(excluded_note)
 
-    phase1_pipeline.run_flagged_term_review(flagged_words, accepted_definitions, decisions)
+    phase1_pipeline.run_flagged_term_review(
+        flagged_words, accepted_definitions, decisions, stem_occurrences=stem_occurrences,
+    )
     print("\nSaving updated results...")
     phase1_pipeline.save_glossbert_output(accepted_definitions, paths.glossbert_output())
     print(f"\nUpdated results saved to {paths.glossbert_output()}")
@@ -263,7 +358,8 @@ def run_phase1(args, paths, decisions):
 
 
 def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_state, nlp, stemmer,
-                           text, enriched_state, title=None, authors=None, date=None):
+                           text, enriched_state, title=None, authors=None, date=None,
+                           adversarial_notice=None):
     """Runs injection analysis -> borderline review -> cluster coverage ->
     report building -> saving (condensed text, injection report, HTML
     fragment/preview, human report, plain summary, standalone report),
@@ -297,7 +393,7 @@ def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_s
         corpus_name=args.corpus, rate=rate,
         source_word_count=condense.count_words(text),
         phase1_json_name=paths.phase1_state_json().name,
-        title=title, authors=authors, date=date,
+        title=title, authors=authors, date=date, adversarial_notice=adversarial_notice,
     )
     preview = condensation_report.build_standalone_preview(fragment, args.corpus)
     ordered_sentences = condense.gather_ordered_informative_sentences(enriched_state)
@@ -305,6 +401,7 @@ def process_and_save_rate(rate, condensed_text, args, paths, decisions, phase1_s
     report = condensation_report.build_human_report(
         all_spans, borderline_flags, coverage,
         stats["verbatim_overlap_pct"], stats["non_injected_pct"], sanity_issues,
+        adversarial_notice=adversarial_notice,
     )
     blocks = condensation_report.parse_condensed_blocks(condensed_text)
     summary = condensation_report.build_plain_summary(blocks)
@@ -353,7 +450,7 @@ def edit_prompt_via_tempfile(default_prompt):
 
 def run_regeneration_loop(condensed_texts, args, paths, decisions, phase1_state, nlp, stemmer, text,
                            enriched_state, ordered_sentences, cluster_key_terms, ollama_model, max_trials,
-                           title=None, authors=None, date=None):
+                           adversarial_model, title=None, authors=None, date=None):
     """After all requested rates have been generated and their reports
     built, offers to regenerate one -- optionally at a different target
     rate, optionally with a hand-edited prompt -- for as many rounds as
@@ -458,10 +555,19 @@ def run_regeneration_loop(condensed_texts, args, paths, decisions, phase1_state,
             note = "using the closest trial instead of discarding it" if result["soft_accept"] else "no valid trial"
             print(f"\n{rate}%: no trial hit the target word count within tolerance -- {note}.")
 
-        condensed_texts[rate] = result["text"]
+        final_text, was_fixed, _, issues = condense.run_adversarial_review(
+            result["text"], ordered_sentences, target_words, args.corpus,
+            adversarial_model, decisions, rate,
+        )
+        if was_fixed:
+            print(f"\n{rate}%: Adversarial reviewer auto-fixed the condensation ({'; '.join(issues)}). "
+                  "Original text is in the decision log.")
+
+        condensed_texts[rate] = final_text
         process_and_save_rate(
-            rate, result["text"], args, paths, decisions, phase1_state, nlp, stemmer, text, enriched_state,
+            rate, final_text, args, paths, decisions, phase1_state, nlp, stemmer, text, enriched_state,
             title=title, authors=authors, date=date,
+            adversarial_notice=issues if was_fixed else None,
         )
         print(f"\nRegenerated {rate}% condensation.")
 
@@ -517,7 +623,14 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text, origina
     phase2_pipeline.save_informative_sentences(enriched_state, paths.phase2_output_json())
     print(f"\nSaved enriched JSON to\n{paths.phase2_output_json()}")
 
-    rates, ollama_model, max_trials = resolve_condensation_config(args, decisions)
+    decisions.record(
+        step="phase2_setup", decision_type="sentence_selection_config",
+        prompt="Phase 2 sentence-selection config",
+        choice=f"top_n={args.top_n}, density_percentile={args.density_percentile}",
+        extra={"source": "cli"},
+    )
+
+    rates, ollama_model, max_trials, adversarial_model = resolve_condensation_config(args, decisions)
 
     # Metadata detection reads the untouched original input, not `text`
     # (which may already be Phase-0-cleaned) -- title/author/date front
@@ -531,8 +644,10 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text, origina
     cluster_key_terms = condense.gather_cluster_key_terms(enriched_state)
 
     condensed_texts = {}
+    target_words_by_rate = {}
     for rate in rates:
         target_words = condense.target_word_count(text, rate)
+        target_words_by_rate[rate] = target_words
         result = condense.run_generate_for_rate(
             rate, ordered_sentences, cluster_key_terms, target_words, args.corpus,
             text, ollama_model, max_trials, decisions,
@@ -542,9 +657,18 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text, origina
         condensed_texts[rate] = result["text"]
 
     for rate, condensed_text in condensed_texts.items():
+        condensed_text, was_fixed, _, issues = condense.run_adversarial_review(
+            condensed_text, ordered_sentences, target_words_by_rate[rate], args.corpus,
+            adversarial_model, decisions, rate,
+        )
+        if was_fixed:
+            condensed_texts[rate] = condensed_text
+            print(f"\n{rate}%: Adversarial reviewer auto-fixed the condensation ({'; '.join(issues)}). "
+                  "Original text is in the decision log.")
         process_and_save_rate(
             rate, condensed_text, args, paths, decisions, phase1_state, nlp, stemmer, text, enriched_state,
             title=title, authors=authors, date=date,
+            adversarial_notice=issues if was_fixed else None,
         )
 
     run_phase3(args, paths, phase1_state, nlp, stemmer, text, condensed_texts)
@@ -552,23 +676,126 @@ def run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text, origina
     run_regeneration_loop(
         condensed_texts, args, paths, decisions, phase1_state, nlp, stemmer, text,
         enriched_state, ordered_sentences, cluster_key_terms, ollama_model, max_trials,
-        title=title, authors=authors, date=date,
+        adversarial_model, title=title, authors=authors, date=date,
     )
+
+
+def _print_corpus_list():
+    corpora = resume.list_corpora()
+    if not corpora:
+        print("No corpora found under data/.")
+        return
+    print(f"{'corpus':<30} {'resumable at':<20} {'condensed rates'}")
+    print("-" * 70)
+    for name in corpora:
+        summary = resume.corpus_phase_summary(name)
+        resumable = [p for p in summary["available_start_phases"] if p >= 2]
+        resumable_str = ", ".join(f"Phase {p}" for p in resumable) if resumable else "(new-only)"
+        rates_str = ", ".join(f"{r}%" for r in summary["rates"]) if summary["rates"] else "-"
+        print(f"{name:<30} {resumable_str:<20} {rates_str}")
+
+
+def _load_resume_state(args, paths):
+    """Loads whatever run_phase2/run_phase3 need from an already-existing
+    corpus, rather than producing it via place_raw_text/run_phase1 --
+    used by both --start-phase 2 and 3. lang_model is recovered from
+    Phase 1's own decision log if that run logged it (see
+    phase1_pipeline.log_phase1_config -- older runs predating that
+    feature won't have it), falling back to --lang-model's default
+    otherwise."""
+    with open(paths.raw_txt(), "r", encoding="utf-8") as f:
+        text = f.read()
+    phase1_state = phase2_pipeline.load_phase1_state(paths.phase1_state_json())
+
+    lang_model = resume.find_last_decision_choice(args.corpus, "phase1", "lang_model_choice") or args.lang_model
+    nlp = spacy.load(lang_model)
+    stemmer = PorterStemmer()
+    return phase1_state, nlp, stemmer, text
 
 
 def main():
     args = parse_args()
 
+    if args.list_corpora:
+        _print_corpus_list()
+        return
+
+    if not args.corpus:
+        raise SystemExit("--corpus is required (unless --list-corpora).")
+
+    if args.start_phase == 1:
+        if not args.input:
+            raise SystemExit(
+                "--input is required when --start-phase is 1 (the default). "
+                "Use --start-phase 2 or 3 to resume an existing --corpus instead, "
+                "or --list-corpora to see what's resumable."
+            )
+    elif args.input:
+        raise SystemExit(
+            f"--input is not used with --start-phase {args.start_phase} -- the existing "
+            "corpus's already-saved raw text is reused as-is. Omit --input, or use "
+            "--start-phase 1 to convert and place a new file."
+        )
+    elif args.clean:
+        print(f"Note: --clean is ignored with --start-phase {args.start_phase} "
+              "(Phase 0 only runs as part of starting a new corpus at Phase 1).")
+
     paths = CorpusPaths(args.corpus)
+
+    # Prerequisite-check BEFORE ensure_dirs() when resuming -- otherwise a
+    # failed check for a nonexistent/incomplete corpus would still leave
+    # behind a full tree of empty data/<corpus>/* directories.
+    if args.start_phase >= 2:
+        ok, missing, available_rates = resume.check_prerequisites(paths, args.start_phase)
+        if not ok:
+            lines = "\n".join(f"  - {m}" for m in missing)
+            raise SystemExit(
+                f"Cannot start corpus {args.corpus!r} at Phase {args.start_phase}: "
+                f"missing required file(s):\n{lines}\n"
+                "Run the earlier phase(s) first, or use --list-corpora to see what's "
+                "actually resumable."
+            )
+
     paths.ensure_dirs()
 
-    original_text = place_raw_text(args, paths)
+    if args.start_phase == 1:
+        original_text = place_raw_text(args, paths)
 
-    decisions1 = DecisionLog(args.corpus, phase="phase1")
-    phase1_state, nlp, stemmer, text = run_phase1(args, paths, decisions1)
+        decisions1 = DecisionLog(args.corpus, phase="phase1")
+        phase1_state, nlp, stemmer, text = run_phase1(args, paths, decisions1)
 
-    decisions2 = DecisionLog(args.corpus, phase="phase2")
-    run_phase2(args, paths, decisions2, phase1_state, nlp, stemmer, text, original_text)
+        decisions2 = DecisionLog(args.corpus, phase="phase2")
+        run_phase2(args, paths, decisions2, phase1_state, nlp, stemmer, text, original_text)
+
+    elif args.start_phase == 2:
+        print(f"Resuming corpus {args.corpus!r} at Phase 2 (reusing its saved raw text and Phase 1 state).")
+        phase1_state, nlp, stemmer, text = _load_resume_state(args, paths)
+
+        # The true pre-Phase-0-clean original text (see place_raw_text)
+        # only ever existed in memory during the original run -- it isn't
+        # persisted anywhere, so source-metadata detection falls back to
+        # the saved raw text instead, which may already be Phase-0-cleaned.
+        original_text = text
+        print("Note: the untouched pre-cleaning original text isn't available when resuming -- "
+              "source-metadata detection will use the saved raw text instead.")
+
+        decisions2 = DecisionLog(args.corpus, phase="phase2")
+        run_phase2(args, paths, decisions2, phase1_state, nlp, stemmer, text, original_text)
+
+    elif args.start_phase == 3:
+        ok, _, available_rates = resume.check_prerequisites(paths, 3)
+        print(f"Resuming corpus {args.corpus!r} at Phase 3 only (reusing saved raw text, Phase 1 "
+              f"state, and existing condensed rate(s): {available_rates}). Condensations are not "
+              "regenerated; only the distant-reading report is rebuilt.")
+        phase1_state, nlp, stemmer, text = _load_resume_state(args, paths)
+
+        condensed_texts = {}
+        for rate in available_rates:
+            condensed_path = paths.condensation_paths(rate)["condensed_text"]
+            with open(condensed_path, "r", encoding="utf-8") as f:
+                condensed_texts[rate] = f.read()
+
+        run_phase3(args, paths, phase1_state, nlp, stemmer, text, condensed_texts)
 
     print("\nPipeline complete.")
 

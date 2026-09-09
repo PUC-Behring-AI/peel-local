@@ -140,10 +140,15 @@ def run_collocation_review(candidates, decisions):
     print("meaningful.\n")
     print(format_collocation_candidates(candidates))
 
-    raw = input("\nType numbers to select (comma-separated), or ENTER for the top-ranked pair: ").strip()
+    raw = input(
+        "\nType numbers to select (comma-separated), 'all' for every candidate, "
+        "or ENTER for the top-ranked pair: "
+    ).strip()
 
     if not raw:
         indices = {0}
+    elif raw.lower() in ("all", "*"):
+        indices = set(range(len(candidates)))
     else:
         try:
             indices = {int(x.strip()) - 1 for x in raw.split(",") if x.strip()}

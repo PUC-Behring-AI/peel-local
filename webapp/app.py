@@ -28,7 +28,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from flask import Flask, jsonify, request, send_file, send_from_directory
 
-from common import ollama_client
+from common import ollama_client, resume
 from common.paths import CorpusPaths
 from webapp.pipeline_session import PipelineSession
 
@@ -39,10 +39,13 @@ _session = PipelineSession()
 _CORPUS_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 _CONFIG_DEFAULTS = {
-    "top_percentile": ("float", 0.50),
+    "frequency_percentile": ("float", 0.50),
     "max_stems": ("int", 150),
+    "word_frequency_percentile": ("float", 0.0),
     "max_sentences_per_stem": ("int", 5),
     "max_synsets": ("int", 5),
+    "merge_duplicate_word_occurrences": ("bool", False),
+    "run_parameter_sweep": ("bool", False),
     "max_cluster_size": ("int", 10),
     "min_clusters": ("int", 5),
     "min_cluster_len": ("int", 3),
@@ -103,7 +106,10 @@ def start():
             config[key] = default
             continue
         try:
-            config[key] = float(raw) if kind == "float" else (int(raw) if kind == "int" else raw)
+            if kind == "bool":
+                config[key] = raw in ("true", "on", "1")
+            else:
+                config[key] = float(raw) if kind == "float" else (int(raw) if kind == "int" else raw)
         except ValueError:
             return _error(f"Invalid value for {key}: {raw!r}")
 
@@ -122,14 +128,67 @@ def start():
     return jsonify({"ok": True})
 
 
-@app.route("/api/reset", methods=["POST"])
-def reset():
-    """Clears the session back to idle -- used by "Start another run" so a
-    page reload lands on the setup screen instead of init() re-syncing to
-    the just-finished run's still-"complete" server-side status."""
+@app.route("/api/corpora")
+def list_corpora():
+    """Every corpus under data/, with which phases it currently satisfies
+    prerequisites for -- populates the setup screen's "resume an existing
+    corpus" picker so a researcher can see what's actually resumable
+    before picking a phase that would just fail validation."""
+    return jsonify({"corpora": [resume.corpus_phase_summary(name) for name in resume.list_corpora()]})
+
+
+@app.route("/api/resume", methods=["POST"])
+def resume_corpus():
     global _session
 
     if _session.status == "running":
+        return _error("A pipeline run is already in progress.", 409)
+
+    body = request.get_json(force=True) or {}
+    corpus_name = (body.get("corpus_name") or "").strip()
+    if not corpus_name or not _CORPUS_NAME_RE.match(corpus_name):
+        return _error("Corpus name is required and may only contain letters, digits, - and _.")
+
+    try:
+        start_phase = int(body.get("start_phase"))
+    except (TypeError, ValueError):
+        return _error("start_phase must be 2 or 3.")
+    if start_phase not in (2, 3):
+        return _error("start_phase must be 2 or 3 (use /api/start for a new corpus at Phase 1).")
+
+    config = {"lang_model": body.get("lang_model") or _CONFIG_DEFAULTS["lang_model"][1]}
+
+    _session = PipelineSession()
+    try:
+        _session.resume(corpus_name, start_phase, config)
+    except RuntimeError as e:
+        # check_prerequisites failure -- a real "not ready" state, not a
+        # server error, so the UI can show it inline like any other
+        # validation message.
+        return _error(str(e))
+    except Exception as e:  # noqa: BLE001 -- surfaced to the UI, not a bare crash
+        return _error(f"Could not resume the pipeline: {e}", 500)
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/reset", methods=["POST"])
+def reset():
+    """Clears the session back to idle -- used by "Start another run" (on
+    the complete screen) and the header's "Restart" button (available on
+    every screen). `force=true` (sent by the header button, since it can
+    be clicked mid-run) discards the session even while status=="running":
+    the background thread already in flight has no cancellation hook, so
+    it keeps executing to completion against the *old* PipelineSession
+    object -- wasted work, but harmless, since nothing references that
+    object anymore once _session points elsewhere; its result is just
+    never observed. Without `force`, a run in progress is protected."""
+    global _session
+
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force"))
+
+    if _session.status == "running" and not force:
         return _error("A pipeline run is already in progress.", 409)
 
     _session = PipelineSession()
@@ -174,6 +233,23 @@ def decide_cluster_review():
     return jsonify({"ok": True})
 
 
+@app.route("/api/decisions/parameter-sweep", methods=["POST"])
+def decide_parameter_sweep():
+    err = _require_decision("parameter_sweep")
+    if err:
+        return err
+    body = request.get_json(force=True) or {}
+    try:
+        _session.apply_parameter_sweep(
+            choice=body.get("choice", ""),
+            frequency_percentile=float(body["frequency_percentile"]),
+            max_stems=int(body["max_stems"]),
+        )
+    except (RuntimeError, KeyError, ValueError) as e:
+        return _error(str(e), 400)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/decisions/phase2-setup", methods=["POST"])
 def decide_phase2_setup():
     err = _require_decision("phase2_setup")
@@ -187,6 +263,7 @@ def decide_phase2_setup():
             run_condensation=bool(body.get("run_condensation", False)),
             rates_str=body.get("rates", ""),
             ollama_model=body.get("ollama_model", ""),
+            adversarial_model=body.get("adversarial_model", ""),
             max_trials=int(body.get("max_trials", 3)),
             title=body.get("title", ""),
             authors=body.get("authors", ""),

@@ -43,6 +43,7 @@ FUNCTION_WORD_SET = {
     "as", "is", "are", "was", "were", "be", "been", "being",
     "it", "its", "we", "they", "he", "she", "which", "who", "what",
     "i", "you", "your", "my", "our", "one",
+    "will", "would", "can", "could", "shall", "should", "may", "might", "must",
 }
 
 # Nouns that are technically content-bearing by part of speech but function
@@ -66,6 +67,15 @@ DISCOURSE_ADVERBS = {
     "consequently", "nevertheless", "nonetheless", "meanwhile", "indeed",
     "accordingly", "additionally", "besides", "similarly", "likewise",
     "conversely", "otherwise", "instead", "still", "yet",
+    # Latin discourse abbreviations -- spaCy tags these the same way
+    # (dep_=="advmod", e.g. "i.e." is pos_='X'/tag_='FW'), so
+    # _is_connective_token already treats them as connective; stored
+    # here punctuation-stripped since that's what _content_words's
+    # membership test actually compares against ("i.e." -> "ie").
+    # Verified case: real Boisseau text "expertise -- i.e. a sense
+    # that..." was flagged borderline solely because "ie" wasn't
+    # exempted anywhere, not because of a genuine disagreement.
+    "ie", "eg", "cf", "viz",
 }
 
 METALINGUISTIC_MARKERS = (
@@ -258,6 +268,108 @@ def check_condensation_sanity(condensed_text, ordered_sentences):
         _check_repeated_ngram(condensed_text),
     )
     return [issue for issue in checks if issue]
+
+
+def build_adversarial_review_prompt(condensed_text, ordered_sentences, target_words, corpus_name):
+    """Prompt for the adversarial reviewer -- a second LLM pass over an
+    already-accepted condensation, complementary to check_condensation_sanity's
+    regex/statistical heuristics (invented-token runs, mega-long words,
+    repeated n-grams): this pass instead makes a semantic/qualitative
+    judgment call those heuristics can't (does it end mid-thought, does it
+    drift outside the informative-sentence pool)."""
+    sentences_block = "\n".join(f"- {s['sentence']}" for s in ordered_sentences)
+    return (
+        f'You are auditing a condensation of the corpus "{corpus_name}", '
+        f"which was generated to target approximately {target_words} words.\n\n"
+        "Below is the pool of informative sentences the condensation was supposed "
+        "to be built from, followed by the condensation itself. Check the "
+        "condensation for three specific defects:\n"
+        "1. Does it end abruptly, mid-sentence or mid-thought?\n"
+        "2. Does it contain garbled, repeated, or nonsensical sequences of words "
+        "or tokens?\n"
+        "3. Does its content drift substantially outside the topics/claims covered "
+        "by the informative sentences below (i.e. does it introduce ideas not "
+        "grounded in that pool)?\n\n"
+        f"Informative sentences:\n{sentences_block}\n\n"
+        f"Condensation to audit:\n{condensed_text}\n\n"
+        "If none of these three defects are present, respond with exactly:\n"
+        "VERDICT: OK\n\n"
+        "If any defect is present, fix ONLY that defect (make the smallest "
+        "possible edit; do not rewrite for style), keep the result as close as "
+        f"possible to {target_words} words, and respond in exactly this format:\n"
+        "VERDICT: FIXED\n"
+        "ISSUES: <comma-separated short description of each defect found>\n"
+        "TEXT:\n<the corrected condensation, and nothing else after it>"
+    )
+
+
+def parse_adversarial_response(response_text):
+    """Parses the adversarial reviewer's structured response. Returns
+    (verdict, issues, fixed_text): verdict is "OK", "FIXED", or
+    "UNPARSEABLE" (the model didn't follow the format -- treated as a
+    no-op by the caller, never as license to guess); issues is a list of
+    short strings; fixed_text is the corrected condensation, or None."""
+    match = re.search(r"VERDICT:\s*(OK|FIXED)", response_text, re.IGNORECASE)
+    if not match:
+        return "UNPARSEABLE", ["could not parse a VERDICT from the reviewer's response"], None
+
+    verdict = match.group(1).upper()
+    if verdict == "OK":
+        return "OK", [], None
+
+    issues_match = re.search(r"ISSUES:\s*(.+?)(?:\n\s*TEXT:|\Z)", response_text, re.IGNORECASE | re.DOTALL)
+    issues = [i.strip() for i in issues_match.group(1).split(",") if i.strip()] if issues_match else []
+
+    text_match = re.search(r"TEXT:\s*\n?(.*)\Z", response_text, re.IGNORECASE | re.DOTALL)
+    fixed_text = text_match.group(1).strip() if text_match else None
+
+    return "FIXED", issues, fixed_text
+
+
+def run_adversarial_review(condensed_text, ordered_sentences, target_words, corpus_name,
+                            adversarial_model, decisions, rate, host=ollama_client.DEFAULT_HOST,
+                            timeout=600):
+    """Runs the adversarial reviewer once over an already-accepted
+    condensation. Returns (final_text, was_fixed, original_text, issues).
+
+    Fails safe on any problem (unreachable Ollama, unparseable response, or
+    a degenerate "fixed" text) by keeping the original text -- an
+    adversarial-review failure should never be able to break the pipeline
+    or silently replace good text with garbage. Every outcome is logged via
+    the existing DecisionLog mechanism, with the original text always
+    preserved in `extra` for audit even when a fix is applied."""
+    prompt = build_adversarial_review_prompt(condensed_text, ordered_sentences, target_words, corpus_name)
+
+    try:
+        response = ollama_client.generate(adversarial_model, prompt, host=host, timeout=timeout, think=False)
+    except ollama_client.OllamaError as e:
+        decisions.record(
+            step="condensation_generation", decision_type="adversarial_review_result",
+            prompt="Adversarial reviewer check on accepted condensation",
+            choice="unchanged",
+            extra={"rate": rate, "model": adversarial_model, "issues_found": [f"reviewer call failed: {e}"],
+                   "original_text": condensed_text, "fixed_text": None},
+        )
+        return condensed_text, False, condensed_text, [f"reviewer call failed: {e}"]
+
+    verdict, issues, fixed_text = parse_adversarial_response(response)
+
+    was_fixed = False
+    final_text = condensed_text
+    if verdict == "FIXED" and fixed_text and count_words(fixed_text) >= 0.5 * target_words:
+        final_text = fixed_text
+        was_fixed = True
+    elif verdict == "FIXED":
+        issues = issues + ["fixed text rejected as degenerate (empty or far too short); kept original"]
+
+    decisions.record(
+        step="condensation_generation", decision_type="adversarial_review_result",
+        prompt="Adversarial reviewer check on accepted condensation",
+        choice="fixed" if was_fixed else "unchanged",
+        extra={"rate": rate, "model": adversarial_model, "issues_found": issues,
+               "original_text": condensed_text, "fixed_text": final_text if was_fixed else None},
+    )
+    return final_text, was_fixed, condensed_text, issues
 
 
 def format_trial_line(t, prefix=""):
@@ -518,7 +630,7 @@ def run_condensation_setup(decisions, host=ollama_client.DEFAULT_HOST):
     decisions log via `decisions.record(...)` for later audit -- it does
     not change the interactive flow. Shared by phase2.ipynb and
     run_pipeline.py so there's one implementation, not two. Returns
-    (rates, ollama_model, max_trials)."""
+    (rates, ollama_model, max_trials, adversarial_model)."""
     if not ollama_client.is_available(host=host):
         print(
             f"Ollama does not appear to be running at {host}.\n"
@@ -548,6 +660,16 @@ def run_condensation_setup(decisions, host=ollama_client.DEFAULT_HOST):
         prompt="Which Ollama model would you like to use?", choice=ollama_model,
     )
 
+    adversarial_model = input(
+        f"\nWhich Ollama model should the adversarial reviewer use? "
+        f"(ENTER to reuse '{ollama_model}'): "
+    ).strip() or ollama_model
+
+    decisions.record(
+        step="condensation_setup", decision_type="adversarial_model_choice",
+        prompt="Which Ollama model should the adversarial reviewer use?", choice=adversarial_model,
+    )
+
     max_trials = int(input("\nHow many generation trials before asking to escalate? ").strip())
 
     decisions.record(
@@ -557,10 +679,11 @@ def run_condensation_setup(decisions, host=ollama_client.DEFAULT_HOST):
 
     print(
         f"\nWill generate condensations at {rates}% using '{ollama_model}', "
-        f"up to {max_trials} trial(s) each before escalation."
+        f"up to {max_trials} trial(s) each before escalation. Adversarial reviewer: "
+        f"'{adversarial_model}'."
     )
 
-    return rates, ollama_model, max_trials
+    return rates, ollama_model, max_trials, adversarial_model
 
 
 def run_sanity_review_for_rate(rate, result, decisions, escalated=False):
@@ -906,11 +1029,18 @@ def classify_span(sent, source_sentences, source_lower, span_id):
         # flag_borderline_classifications) -- candidate_source_ref keeps
         # that already-computed match around, unused unless this span
         # gets flagged borderline, so a reviewer isn't left with zero
-        # context to judge the call.
+        # context to judge the call. candidate_overlap/candidate_diff_text
+        # carry forward the SAME diff_tokens already computed above (for
+        # the F check) so flag_borderline_classifications can, when the
+        # candidate is a strong match, flag based on how much this span
+        # actually diverges from it instead of an absolute whole-sentence
+        # word count -- diff_tokens is deliberately not thrown away here.
         return {
             "span_id": span_id, "type": "T", "text": sentence,
             "source_refs": [], "justification": "", "basis": "phrase_match",
             "candidate_source_ref": best_idx,
+            "candidate_overlap": round(best_overlap, 4),
+            "candidate_diff_text": [t.text for t in diff_tokens] if best_idx is not None else None,
         }
 
     # T: a small (<=6-token) delta from the best-matching source sentence
@@ -1000,8 +1130,18 @@ def flag_borderline_classifications(all_spans):
       legitimately contain lots of real content in its matched/aligned
       portion now, so flagging on the whole sentence would misfire on
       every ordinary case.
-    - "phrase_match" (T, the original metalinguistic-phrase rule):
-      unchanged content-density check.
+    - "phrase_match" (T, the original metalinguistic-phrase rule): if the
+      span's candidate source sentence is a strong match (overlap >= 0.7 --
+      deliberately stricter than R's own 0.5 "this candidate explains the
+      sentence" bar, since a diff-based flag here is only trustworthy
+      against a near-verbatim candidate, not merely a dominant one),
+      cross-checks only the diff against that candidate -- same diff-based
+      precision as diff_connective/
+      diff_lexical, catching e.g. a metalinguistic-tagged sentence that's
+      actually near-verbatim with one real word changed. Otherwise (no
+      candidate, or too weak to trust a diff against) falls back to the
+      original whole-sentence content-density check, since there's no
+      well-defined "correct" source sentence to diff against.
     - "diff_lexical" (T, the new diff-based rule): never flagged --
       containing lexical content is expected by construction, not a
       borderline signal."""
@@ -1035,24 +1175,48 @@ def flag_borderline_classifications(all_spans):
                                f"{len(content_words)} of them content-bearing -- worth a manual check."),
                 })
         elif s["type"] == "T" and basis == "phrase_match":
-            content_words = _content_words(s["text"], DISCOURSE_MARKER_EXTRAS)
-            if len(content_words) > 4:
-                # This span's real source_refs is always [] by design (see
-                # classify_span) -- but candidate_source_ref kept the
-                # content-word-overlap match that was computed anyway, so
-                # a reviewer deciding whether to move this to R/C can see
-                # what it would most likely attribute to instead of
-                # nothing. Not an official match -- source_is_candidate_only
-                # tells callers to label it as such, not as a confirmed
-                # attribution.
-                candidate_ref = s.get("candidate_source_ref")
-                flags.append({
-                    "span_id": s["span_id"], "type": "T", "text": s["text"],
-                    "source_refs": [candidate_ref] if candidate_ref is not None else [],
-                    "source_is_candidate_only": candidate_ref is not None,
-                    "reason": (f"{len(content_words)} content-bearing tokens -- unusually high for a "
-                               "metalinguistic span; may carry object-level content that belongs in R or C instead"),
-                })
+            # This span's real source_refs is always [] by design (see
+            # classify_span) -- but candidate_source_ref/candidate_overlap/
+            # candidate_diff_text kept the content-word-overlap match (and
+            # its diff) that was computed anyway, so a reviewer deciding
+            # whether to move this to R/C can see what it would most
+            # likely attribute to instead of nothing. Not an official
+            # match -- source_is_candidate_only tells callers to label it
+            # as such, not as a confirmed attribution.
+            candidate_ref = s.get("candidate_source_ref")
+            candidate_overlap = s.get("candidate_overlap") or 0.0
+            candidate_diff_text = s.get("candidate_diff_text")
+
+            if candidate_diff_text is not None and candidate_overlap >= 0.7:
+                # Strong candidate match -- flag based on how much this
+                # span actually diverges from it, not an absolute
+                # whole-sentence word count (the same diff-based precision
+                # diff_connective/diff_lexical already use).
+                diff_text = " ".join(candidate_diff_text)
+                content_words = _content_words(diff_text, DISCOURSE_MARKER_EXTRAS)
+                if content_words:
+                    flags.append({
+                        "span_id": s["span_id"], "type": "T", "text": s["text"],
+                        "source_refs": [candidate_ref] if candidate_ref is not None else [],
+                        "source_is_candidate_only": candidate_ref is not None,
+                        "reason": (f"Nearly identical to its closest candidate source sentence "
+                                   f"({candidate_overlap:.0%} content-word overlap) -- diverges by "
+                                   f"{len(content_words)} content-bearing token(s): {diff_text!r}. "
+                                   "Called metalinguistic, but this close to a real source sentence "
+                                   "it may carry object-level content that belongs in R or C instead."),
+                    })
+            else:
+                # No candidate strong enough to trust a diff against --
+                # fall back to the original whole-sentence density check.
+                content_words = _content_words(s["text"], DISCOURSE_MARKER_EXTRAS)
+                if len(content_words) > 4:
+                    flags.append({
+                        "span_id": s["span_id"], "type": "T", "text": s["text"],
+                        "source_refs": [candidate_ref] if candidate_ref is not None else [],
+                        "source_is_candidate_only": candidate_ref is not None,
+                        "reason": (f"{len(content_words)} content-bearing tokens -- unusually high for a "
+                                   "metalinguistic span; may carry object-level content that belongs in R or C instead"),
+                    })
     return flags
 
 

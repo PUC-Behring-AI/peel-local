@@ -93,6 +93,7 @@ function handleStatus(data, opts) {
 
 function renderDecision(decision) {
   switch (decision.type) {
+    case "parameter_sweep": return renderParameterSweep(decision.payload);
     case "flagged_term_review": return renderFlaggedTermReview(decision.payload);
     case "cluster_review": return renderClusterReview(decision.payload);
     case "phase2_setup": return renderPhase2Setup(decision.payload);
@@ -117,6 +118,8 @@ $("#setup-form").addEventListener("submit", async (e) => {
   const form = e.target;
   const fd = new FormData(form);
   fd.set("clean", $("#clean").checked ? "true" : "false");
+  fd.set("merge_duplicate_word_occurrences", $("#merge_duplicate_word_occurrences").checked ? "true" : "false");
+  fd.set("run_parameter_sweep", $("#run_parameter_sweep").checked ? "true" : "false");
 
   logOffset = 0;
   $("#log-box").textContent = "";
@@ -130,6 +133,198 @@ $("#setup-form").addEventListener("submit", async (e) => {
     errBox.classList.remove("hidden");
   }
 });
+
+// ------------------------------------------------------------
+// RESUME AN EXISTING CORPUS
+// ------------------------------------------------------------
+
+const PHASE_LABELS = { 2: "Phase 2 (sentence selection & condensation)", 3: "Phase 3 only (distant reading)" };
+let corporaCache = [];
+
+$all(".setup-mode-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    $all(".setup-mode-btn").forEach((b) => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    const resuming = btn.dataset.value === "resume";
+    $("#setup-form").classList.toggle("hidden", resuming);
+    $("#setup-error").classList.add("hidden");
+    $("#resume-panel").classList.toggle("hidden", !resuming);
+    $("#resume-error").classList.add("hidden");
+    if (resuming && corporaCache.length === 0) loadCorpora();
+  });
+});
+
+async function loadCorpora() {
+  const hint = $("#resume-corpus-hint");
+  const select = $("#resume_corpus_name");
+  try {
+    const data = await api("/api/corpora");
+    corporaCache = data.corpora || [];
+  } catch (err) {
+    hint.textContent = `Could not load corpora: ${err.message}`;
+    return;
+  }
+  select.innerHTML = "";
+  if (corporaCache.length === 0) {
+    hint.textContent = "No corpora found under data/ yet -- start a new one first.";
+    $("#resume_start_phase").innerHTML = "";
+    $("#resume-submit").disabled = true;
+    return;
+  }
+  $("#resume-submit").disabled = false;
+  corporaCache.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.corpus_name;
+    opt.textContent = c.corpus_name;
+    select.appendChild(opt);
+  });
+  updateResumePhaseOptions();
+}
+
+function updateResumePhaseOptions() {
+  const corpus = corporaCache.find((c) => c.corpus_name === $("#resume_corpus_name").value);
+  const phaseSelect = $("#resume_start_phase");
+  const hint = $("#resume-corpus-hint");
+  phaseSelect.innerHTML = "";
+  if (!corpus) return;
+
+  const resumablePhases = corpus.available_start_phases.filter((p) => p >= 2);
+  if (resumablePhases.length === 0) {
+    hint.textContent = `${corpus.corpus_name} has no Phase 1 state saved yet -- it can only be run as a new corpus (Phase 1).`;
+    $("#resume-submit").disabled = true;
+    return;
+  }
+  $("#resume-submit").disabled = false;
+  resumablePhases.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = String(p);
+    opt.textContent = PHASE_LABELS[p];
+    phaseSelect.appendChild(opt);
+  });
+  hint.textContent = corpus.rates.length
+    ? `Existing condensed rate(s) for ${corpus.corpus_name}: ${corpus.rates.map((r) => r + "%").join(", ")}.`
+    : `${corpus.corpus_name} has a saved Phase 1 state but no condensed rates yet.`;
+}
+
+$("#resume_corpus_name").addEventListener("change", updateResumePhaseOptions);
+
+$("#resume-submit").addEventListener("click", async () => {
+  const errBox = $("#resume-error");
+  errBox.classList.add("hidden");
+
+  const corpusName = $("#resume_corpus_name").value;
+  const startPhase = parseInt($("#resume_start_phase").value, 10);
+  if (!corpusName || !startPhase) return;
+
+  logOffset = 0;
+  $("#log-box").textContent = "";
+
+  try {
+    await api("/api/resume", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ corpus_name: corpusName, start_phase: startPhase }),
+    });
+    showScreen("screen-progress");
+    startPolling();
+  } catch (err) {
+    errBox.textContent = err.message;
+    errBox.classList.remove("hidden");
+  }
+});
+
+// ------------------------------------------------------------
+// PARAMETER SWEEP
+// ------------------------------------------------------------
+
+let currentSweepCandidates = [];
+let currentSweepMaxStems = null;
+
+function renderParameterSweep(payload) {
+  currentSweepCandidates = payload.candidates;
+  currentSweepMaxStems = payload.max_stems;
+  const container = $("#parameter-sweep-list");
+  container.innerHTML = "";
+
+  const densityPercentiles = Object.keys(payload.candidates[0]?.informative_counts || {});
+
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const candidatesHtml = payload.candidates.map((c, i) => {
+    const infoHtml = densityPercentiles
+      .map((p) => `Informative @${p}th: ${c.informative_counts[p]}`)
+      .join(" &middot; ");
+    return `
+      <label class="sanity-candidate">
+        <input type="radio" name="sweep-choice" value="${i}" ${i === 0 ? "checked" : ""}>
+        frequency_percentile=${c.frequency_percentile} -- ${c.n_stems} stems
+        <ul class="meta">
+          <li>Distinct derived words: ${c.n_distinct_words}</li>
+          <li>Sentences w/ stem hit: ${c.n_sentences_with_stem_hit} / ${c.n_sentences_total}</li>
+          <li>${infoHtml}</li>
+        </ul>
+      </label>`;
+  }).join("");
+
+  card.innerHTML = `
+    <h3>Candidates</h3>
+    ${candidatesHtml}
+    <label class="sanity-candidate">
+      <input type="radio" name="sweep-choice" value="custom">
+      Custom values
+      <div class="grid">
+        <div class="field">
+          <label for="sweep-custom-frequency-percentile">Frequency percentile</label>
+          <input type="number" id="sweep-custom-frequency-percentile" step="0.01" min="0.01" max="1" value="0.50">
+        </div>
+        <div class="field">
+          <label for="sweep-custom-max-stems">Max stems</label>
+          <input type="number" id="sweep-custom-max-stems" step="1" min="1" value="${payload.max_stems}">
+        </div>
+      </div>
+    </label>
+  `;
+  container.appendChild(card);
+
+  showScreen("screen-parameter-sweep");
+}
+
+async function submitParameterSweep() {
+  const checked = document.querySelector('input[name="sweep-choice"]:checked');
+  if (!checked) {
+    alert("Pick a candidate or Custom values.");
+    return;
+  }
+
+  let body;
+  if (checked.value === "custom") {
+    body = {
+      choice: "custom",
+      frequency_percentile: parseFloat($("#sweep-custom-frequency-percentile").value),
+      max_stems: parseInt($("#sweep-custom-max-stems").value, 10),
+    };
+  } else {
+    const candidate = currentSweepCandidates[parseInt(checked.value, 10)];
+    body = {
+      choice: `candidate_${checked.value}`,
+      frequency_percentile: candidate.frequency_percentile,
+      max_stems: currentSweepMaxStems,
+    };
+  }
+
+  try {
+    await api("/api/decisions/parameter-sweep", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    showScreen("screen-progress");
+    startPolling();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+$all(".submit-parameter-sweep").forEach((btn) => btn.addEventListener("click", submitParameterSweep));
 
 // ------------------------------------------------------------
 // FLAGGED TERM REVIEW
@@ -160,7 +355,9 @@ function renderFlaggedTermReview(payload) {
           Pick a candidate:
           <select class="candidate-select" data-id="${item.id}">${candidatesOptions}</select></label><br>
         <label><input type="radio" name="choice-${item.id}" value="manual">
-          Manual definition: <input type="text" class="manual-input" data-id="${item.id}" placeholder="type a definition"></label>
+          Manual definition: <input type="text" class="manual-input" data-id="${item.id}" placeholder="type a definition"></label><br>
+        <label><input type="radio" name="choice-${item.id}" value="delete">
+          Delete this word from all following steps</label>
       </div>
     `;
     container.appendChild(card);
@@ -330,6 +527,12 @@ $all(".submit-cluster-review").forEach((btn) => btn.addEventListener("click", su
 function renderPhase2Setup(payload) {
   $("#phase2-summary").textContent =
     `Phase 1 finished with ${payload.cluster_count} cluster(s). State saved to ${payload.phase1_state_path}.`;
+  // Disabled until AI metadata detection (fired by refreshOllamaModels below)
+  // settles one way or another -- otherwise a researcher who submits before
+  // the (possibly slow) detection call returns locks in blank title/author/
+  // date fields as "Unclear" forever, even though the correct answer shows
+  // up moments later with nothing left to do with it.
+  $("#phase2-submit").disabled = true;
   refreshOllamaModels();
   showScreen("screen-phase2-setup");
 }
@@ -349,9 +552,11 @@ async function detectMetadata(ollamaModel) {
   statusEl.classList.remove("error-text");
   if (!ollamaModel) {
     statusEl.textContent = "Pick an Ollama model above, then AI detection will run automatically.";
+    $("#phase2-submit").disabled = false;
     return;
   }
   statusEl.textContent = "Detecting the source's title/author(s)/date with AI...";
+  $("#phase2-submit").disabled = true;
   try {
     const data = await api(`/api/detect-metadata?ollama_model=${encodeURIComponent(ollamaModel)}`);
     $("#source_title").value = data.title === "Unclear" ? "" : data.title;
@@ -369,33 +574,50 @@ async function detectMetadata(ollamaModel) {
     statusEl.textContent =
       `Could not auto-detect title/author/date (${err.message}). This is worth checking the server ` +
       "console for -- enter the fields manually below in the meantime.";
+  } finally {
+    // Runs on both success and failure -- either way, detection has
+    // settled and there's nothing further this call will do, so
+    // submission can't outrace it anymore.
+    $("#phase2-submit").disabled = false;
   }
 }
 
 async function refreshOllamaModels() {
   const statusEl = $("#ollama-status");
   const select = $("#ollama_model");
+  const adversarialSelect = $("#adversarial_model");
   statusEl.textContent = "Checking Ollama...";
   select.innerHTML = "";
+  adversarialSelect.innerHTML = "";
   try {
     const data = await api("/api/ollama/models");
     if (!data.available) {
       statusEl.textContent = "Ollama does not appear to be running. Install it, pull a model, and start `ollama serve`.";
+      // No Ollama -> detectMetadata will never run -> nothing will ever
+      // lift the disable from renderPhase2Setup unless this does.
+      $("#phase2-submit").disabled = false;
       return;
     }
     if (data.models.length === 0) {
       statusEl.textContent = "Ollama is running but no models are installed. Run `ollama pull <model>`.";
+      $("#phase2-submit").disabled = false;
       return;
     }
     data.models.forEach((name) => {
       const opt = document.createElement("option");
       opt.value = name; opt.textContent = name;
       select.appendChild(opt);
+
+      const advOpt = document.createElement("option");
+      advOpt.value = name; advOpt.textContent = name;
+      adversarialSelect.appendChild(advOpt);
     });
     statusEl.textContent = `Ollama is available -- ${data.models.length} model(s) found.`;
-    if (data.models.length > 0) detectMetadata(select.value);
+    detectMetadata(select.value);
   } catch (err) {
     statusEl.textContent = `Could not check Ollama: ${err.message}`;
+    // The models fetch itself failed -> detectMetadata will never run.
+    $("#phase2-submit").disabled = false;
   }
 }
 
@@ -414,6 +636,7 @@ $("#phase2-form").addEventListener("submit", async (e) => {
         run_condensation: runCondensation,
         rates: $("#rates").value,
         ollama_model: $("#ollama_model").value,
+        adversarial_model: $("#adversarial_model").value,
         max_trials: parseInt($("#max_trials").value, 10),
         title: $("#source_title").value,
         authors: $("#source_authors").value,
@@ -642,7 +865,8 @@ function renderCollocationReview(payload) {
   const table = document.createElement("table");
   table.innerHTML = `
     <thead><tr>
-      <th></th><th>Term A</th><th>Cluster A</th><th>Term B</th><th>Cluster B</th><th>Co-occurrences</th>
+      <th><input type="checkbox" id="colloc-select-all" title="Select all"></th>
+      <th>Term A</th><th>Cluster A</th><th>Term B</th><th>Cluster B</th><th>Co-occurrences</th>
     </tr></thead>
     <tbody></tbody>
   `;
@@ -663,6 +887,19 @@ function renderCollocationReview(payload) {
   });
 
   container.appendChild(table);
+
+  const selectAll = table.querySelector("#colloc-select-all");
+  const picks = () => $all(".colloc-pick", table);
+  const syncSelectAll = () => {
+    const boxes = picks();
+    selectAll.checked = boxes.length > 0 && boxes.every((cb) => cb.checked);
+  };
+  selectAll.addEventListener("change", () => {
+    picks().forEach((cb) => { cb.checked = selectAll.checked; });
+  });
+  picks().forEach((cb) => cb.addEventListener("change", syncSelectAll));
+  syncSelectAll();
+
   showScreen("screen-collocation-review");
 }
 
@@ -713,15 +950,12 @@ function renderComplete(manifest, corpus) {
   const container = $("#complete-files");
   container.innerHTML = "";
 
-  const topLevel = document.createElement("div");
-  topLevel.className = "card file-links";
-  topLevel.innerHTML = "<h3>Phase 1 / decision logs</h3>";
+  const phase1Card = document.createElement("div");
+  phase1Card.className = "card file-links";
+  phase1Card.innerHTML = "<h3>Phase 1 outputs</h3>";
   [
     ["phase1_state", "Phase 1 state JSON"],
     ["phase1_html", "Phase 1 cluster HTML"],
-    ["phase2_output_json", "Informative sentences JSON"],
-    ["phase1_decisions_log", "Phase 1 decision log"],
-    ["phase2_decisions_log", "Phase 2 decision log"],
   ].forEach(([key, label]) => {
     const path = manifest[key];
     if (!path) return;
@@ -729,18 +963,42 @@ function renderComplete(manifest, corpus) {
     a.textContent = label;
     a.href = fileLink(corpus, path);
     a.target = "_blank";
-    topLevel.appendChild(a);
+    phase1Card.appendChild(a);
   });
-  container.appendChild(topLevel);
+  container.appendChild(phase1Card);
 
-  // Phase 2 (condensation rates) before Phase 3 (distant reading), matching
-  // pipeline order -- Phase 3's distant-reading report is built from the
-  // Phase 2 condensations, so it belongs after them here too.
+  // Phase 2 outputs, in their own labeled section -- the non-rate-specific
+  // informative-sentences JSON, then one card per condensation rate. Phase
+  // 2 before Phase 3, matching pipeline order (Phase 3's distant-reading
+  // report is built from the Phase 2 condensations).
+  const phase2Header = document.createElement("h3");
+  phase2Header.className = "section-header";
+  phase2Header.textContent = "Phase 2 outputs";
+  container.appendChild(phase2Header);
+
+  if (manifest.phase2_output_json) {
+    const card = document.createElement("div");
+    card.className = "card file-links";
+    const a = document.createElement("a");
+    a.textContent = "Informative sentences JSON";
+    a.href = fileLink(corpus, manifest.phase2_output_json);
+    a.target = "_blank";
+    card.appendChild(a);
+    container.appendChild(card);
+  }
+
   Object.entries(manifest.rates || {}).forEach(([rate, files]) => {
     const card = document.createElement("div");
     card.className = "card file-links";
     card.innerHTML = `<h3>${rate}% condensation</h3>`;
+    if (files.adversarial_notice) {
+      const notice = document.createElement("p");
+      notice.className = "hint warn";
+      notice.textContent = files.adversarial_notice;
+      card.appendChild(notice);
+    }
     Object.entries(files).forEach(([key, path]) => {
+      if (key === "adversarial_notice") return;
       const label = FILE_LABELS[key] || key;
       const a = document.createElement("a");
       a.textContent = label;
@@ -771,6 +1029,25 @@ function renderComplete(manifest, corpus) {
     container.appendChild(phase3Card);
   }
 
+  const decisionLogsCard = document.createElement("div");
+  decisionLogsCard.className = "card file-links";
+  decisionLogsCard.innerHTML = "<h3>Decision logs</h3>";
+  let hasDecisionLogs = false;
+  [
+    ["phase1_decisions_log", "Phase 1 decision log"],
+    ["phase2_decisions_log", "Phase 2 decision log"],
+  ].forEach(([key, label]) => {
+    const path = manifest[key];
+    if (!path) return;
+    hasDecisionLogs = true;
+    const a = document.createElement("a");
+    a.textContent = label;
+    a.href = fileLink(corpus, path);
+    a.target = "_blank";
+    decisionLogsCard.appendChild(a);
+  });
+  if (hasDecisionLogs) container.appendChild(decisionLogsCard);
+
   currentManifestRates = Object.keys(manifest.rates || {}).map(Number).sort((a, b) => a - b);
   $("#regenerate-panel").classList.toggle("hidden", currentManifestRates.length === 0);
   $("#regen-existing-rates").textContent = currentManifestRates.length
@@ -791,6 +1068,27 @@ $("#start-new-run").addEventListener("click", async () => {
   } catch (err) {
     // Reload anyway -- worst case init() re-syncs to whatever the server
     // still reports, same as before this fix existed.
+  }
+  window.location.reload();
+});
+
+// Header "Restart" button -- available on every screen, not just the
+// complete screen's "Start another run". Unlike that button, this can be
+// clicked mid-run, so it always forces the reset (see /api/reset's
+// `force` handling) and confirms first since it can discard real
+// in-progress work (a running GlossBERT/Ollama step keeps executing in
+// the background but is no longer tracked once the session resets).
+$("#header-restart").addEventListener("click", async () => {
+  if (!confirm("Restart? This discards the current run (any step in progress keeps running in the background but won't be shown) and returns to the setup screen.")) {
+    return;
+  }
+  try {
+    await api("/api/reset", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force: true }),
+    });
+  } catch (err) {
+    // Reload anyway -- same fallback reasoning as "Start another run" above.
   }
   window.location.reload();
 });
