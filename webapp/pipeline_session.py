@@ -491,7 +491,7 @@ class PipelineSession:
         print(f"Clusters found (excluding noise): {len(self.clusters)}")
 
         stem_word_frequencies = phase1_pipeline.build_stem_word_frequency_table(self.stem_occurrences)
-        self.clusters, large_subclusters = phase1_pipeline.recluster_large_clusters(
+        self.clusters, large_subclusters, reembedded_main = phase1_pipeline.recluster_large_clusters(
             self.clusters, self.stem_occurrences, self.embedder, self.tokenizer, self.model, self.device,
             max_cluster_size=self.config["max_cluster_size"], min_clusters=self.config["min_clusters"],
             min_cluster_len=self.config["min_cluster_len"], max_synsets=self.config["max_synsets"],
@@ -519,7 +519,8 @@ class PipelineSession:
         # max_cluster_size split the primary pass's clusters already got
         # above, rather than letting it skip that safety net purely
         # because of which pass produced it.
-        self.noise_clusters, noise_large_subclusters = phase1_pipeline.recluster_large_clusters(
+        reembedded_noise_direct = {s for stems in self.noise_clusters.values() for s in stems}
+        self.noise_clusters, noise_large_subclusters, reembedded_noise_resplit = phase1_pipeline.recluster_large_clusters(
             self.noise_clusters, self.stem_occurrences, self.embedder, self.tokenizer, self.model, self.device,
             max_cluster_size=self.config["max_cluster_size"], min_clusters=self.config["min_clusters"],
             min_cluster_len=self.config["min_cluster_len"], max_synsets=self.config["max_synsets"],
@@ -533,9 +534,15 @@ class PipelineSession:
                   f"{[len(set(v)) for v in still_oversized.values()]}. The data didn't separate further; "
                   "review these in the cluster-review step below.")
 
+        # Stems whose cluster placement came from _split_oversized_clusters_once
+        # or recluster_noise: their clustering embedding used GlossBERT's fresh
+        # top candidate senses, not the researcher's accepted definition, since
+        # neither reclustering function ever sees accepted_definitions.
+        reembedded_noise = reembedded_noise_direct | reembedded_noise_resplit
+
         stem_word_frequencies = phase1_pipeline.build_stem_word_frequency_table(self.stem_occurrences)
-        renamed_clusters = phase1_pipeline.rename_clusters(self.clusters, stem_word_frequencies)
-        renamed_noise_clusters = phase1_pipeline.rename_clusters(self.noise_clusters, stem_word_frequencies)
+        renamed_clusters = phase1_pipeline.rename_clusters(self.clusters, stem_word_frequencies, reembedded_main, reembedded_source="main")
+        renamed_noise_clusters = phase1_pipeline.rename_clusters(self.noise_clusters, stem_word_frequencies, reembedded_noise, reembedded_source="noise")
         renamed_clusters = phase1_pipeline.merge_named_clusters(renamed_clusters, renamed_noise_clusters)
 
         sentence_cache = phase1_pipeline.build_sentence_token_cache(
@@ -554,7 +561,11 @@ class PipelineSession:
             "type": "cluster_review",
             "payload": {
                 "clusters": [
-                    {"name": name, "stems": data["stems"], "ngrams": data.get("ngrams", [])}
+                    {
+                        "name": name, "stems": data["stems"], "ngrams": data.get("ngrams", []),
+                        "reembedded_stems": data.get("reembedded_stems", []),
+                        "reembedded_source": data.get("reembedded_source"),
+                    }
                     for name, data in sorted(self.renamed_clusters.items())
                 ]
             },
@@ -582,11 +593,22 @@ class PipelineSession:
             new_name = (entry.get("new_name") or "").strip() or entry["original_name"]
             excluded_cluster_ngrams.update(entry.get("removed_ngrams", []))
 
+            # reembedded_stems/reembedded_source aren't something the researcher
+            # edits, so they're looked up server-side from the original cluster
+            # data (already computed in _step_after_flagged_review) rather than
+            # round-tripped through the browser -- filtered to stems that
+            # survived review, same as the CLI's run_cluster_review does.
+            original_cluster = self.renamed_clusters.get(entry["original_name"], {})
+            original_reembedded = original_cluster.get("reembedded_stems", [])
+            kept_stems = entry["kept_stems"]
+
             final_clusters[new_name] = {
-                "stems": entry["kept_stems"],
+                "stems": kept_stems,
                 "ngrams": entry.get("kept_ngrams", []),
                 "excluded_stems": entry.get("removed_stems", []),
                 "excluded_ngrams": entry.get("removed_ngrams", []),
+                "reembedded_stems": [s for s in original_reembedded if s in kept_stems],
+                "reembedded_source": original_cluster.get("reembedded_source"),
             }
 
         self.final_clusters = final_clusters

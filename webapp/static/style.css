@@ -9,6 +9,10 @@
   --card-bg: #f7f6f3;
   --danger: #8b3a2a;
   --danger-bg: #fbeceb;
+  --caution: #9a6300;
+  --caution-bg: #fbf1de;
+  --caution-alt: #6b4c9a;
+  --caution-alt-bg: #f0eaf9;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,6 +26,10 @@
     --card-bg: #1e2126;
     --danger: #e0a090;
     --danger-bg: #3a1f1c;
+    --caution: #d6a94a;
+    --caution-bg: #3a2f16;
+    --caution-alt: #c7a8ea;
+    --caution-alt-bg: #2e2440;
   }
 }
 
@@ -203,6 +211,16 @@ button.link-btn {
 }
 .chip input[type="checkbox"] { margin: 0; }
 .chip.removed { opacity: 0.5; text-decoration: line-through; }
+/* Two distinct colors for the two mechanisms that bypass a researcher's
+   accepted definition (see REEMBEDDED_SOURCE_STYLE in phase1/pipeline.py) --
+   main = large-cluster re-split (amber), noise = noise recovery (violet). */
+.chip.chip-reembedded-main { border-color: var(--caution); background: var(--caution-bg); }
+.chip.chip-reembedded-noise { border-color: var(--caution-alt); background: var(--caution-alt-bg); }
+.reembedded-flag { color: var(--caution); }
+.chip-reembedded-noise .reembedded-flag { color: var(--caution-alt); }
+.reembedded-note { padding: 0.5rem 0.7rem; border-radius: 6px; font-weight: 600; }
+.reembedded-note.chip-reembedded-main { color: var(--caution); background: var(--caution-bg); }
+.reembedded-note.chip-reembedded-noise { color: var(--caution-alt); background: var(--caution-alt-bg); }
 
 .choice-row select,
 .choice-row input[type="text"] {

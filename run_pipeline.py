@@ -289,7 +289,7 @@ def run_phase1(args, paths, decisions):
     renamed_clusters = phase1_pipeline.rename_clusters(clusters, stem_word_frequencies)
     phase1_pipeline.print_named_clusters(renamed_clusters, "SEMANTIC CLUSTERS (BEFORE RECLUSTERING)")
 
-    clusters, large_subclusters = phase1_pipeline.recluster_large_clusters(
+    clusters, large_subclusters, reembedded_main = phase1_pipeline.recluster_large_clusters(
         clusters, stem_occurrences, embedder, tokenizer, model, device,
         max_cluster_size=args.max_cluster_size, min_clusters=args.min_clusters,
         min_cluster_len=args.min_cluster_len, max_synsets=args.max_synsets,
@@ -314,7 +314,8 @@ def run_phase1(args, paths, decisions):
     # small ones) -- run it through the same max_cluster_size split the
     # primary pass's output already gets, rather than letting it skip
     # that safety net purely because of which pass produced it.
-    noise_clusters, noise_large_subclusters = phase1_pipeline.recluster_large_clusters(
+    reembedded_noise_direct = {s for stems in noise_clusters.values() for s in stems}
+    noise_clusters, noise_large_subclusters, reembedded_noise_resplit = phase1_pipeline.recluster_large_clusters(
         noise_clusters, stem_occurrences, embedder, tokenizer, model, device,
         max_cluster_size=args.max_cluster_size, min_clusters=args.min_clusters,
         min_cluster_len=args.min_cluster_len, max_synsets=args.max_synsets,
@@ -329,9 +330,15 @@ def run_phase1(args, paths, decisions):
               f"{[len(set(v)) for v in still_oversized.values()]}. The data didn't separate further; "
               "review these in the cluster-review step below.")
 
+    # Stems whose cluster placement came from _split_oversized_clusters_once
+    # or recluster_noise: their clustering embedding used GlossBERT's fresh
+    # top candidate senses, not the researcher's accepted definition, since
+    # neither reclustering function ever sees accepted_definitions.
+    reembedded_noise = reembedded_noise_direct | reembedded_noise_resplit
+
     stem_word_frequencies = phase1_pipeline.build_stem_word_frequency_table(stem_occurrences)
-    renamed_clusters = phase1_pipeline.rename_clusters(clusters, stem_word_frequencies)
-    renamed_noise_clusters = phase1_pipeline.rename_clusters(noise_clusters, stem_word_frequencies)
+    renamed_clusters = phase1_pipeline.rename_clusters(clusters, stem_word_frequencies, reembedded_main, reembedded_source="main")
+    renamed_noise_clusters = phase1_pipeline.rename_clusters(noise_clusters, stem_word_frequencies, reembedded_noise, reembedded_source="noise")
     renamed_clusters = phase1_pipeline.merge_named_clusters(renamed_clusters, renamed_noise_clusters)
     phase1_pipeline.print_named_clusters(renamed_clusters, "SEMANTIC CLUSTERS")
 

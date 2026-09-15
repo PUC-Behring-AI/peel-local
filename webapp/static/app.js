@@ -409,21 +409,51 @@ function renderClusterReview(payload) {
   const container = $("#cluster-review-list");
   container.innerHTML = "";
 
+  // Static legend explaining the two re-embedded colors -- only shown when
+  // this run actually has at least one flagged stem anywhere, so a run with
+  // none doesn't carry an explanation for a color the researcher never sees.
+  const anyReembedded = payload.clusters.some((c) => (c.reembedded_stems || []).length > 0);
+  $("#cluster-review-legend").classList.toggle("hidden", !anyReembedded);
+
   payload.clusters.forEach((cluster, idx) => {
     const card = document.createElement("div");
     card.className = "card";
     card.dataset.originalName = cluster.name;
     card.dataset.index = idx;
 
-    const stemChips = cluster.stems.map((s) => `
-      <label class="chip">
-        <input type="checkbox" class="stem-keep" value="${escapeHtml(s)}" checked> ${escapeHtml(s)}
-      </label>`).join("");
+    // Two distinct colors (see REEMBEDDED_SOURCE_STYLE in phase1/pipeline.py,
+    // same source->color mapping as the HTML export) so a researcher can tell
+    // at a glance which reclustering mechanism bypassed their accepted
+    // definition: noise recovery ALWAYS uses fresh GlossBERT senses for every
+    // stem in that cluster, while a large-cluster re-split only affects the
+    // specific stems actually moved into a new subcluster.
+    const REEMBEDDED_SOURCE_INFO = {
+      main: { cssClass: "chip-reembedded-main", label: "large-cluster re-split" },
+      noise: { cssClass: "chip-reembedded-noise", label: "noise recovery" },
+    };
+    const reembeddedStems = new Set(cluster.reembedded_stems || []);
+    const sourceInfo = REEMBEDDED_SOURCE_INFO[cluster.reembedded_source] || { cssClass: "chip-reembedded-main", label: "a re-split/recovery pass" };
+    const stemChips = cluster.stems.map((s) => {
+      const flagged = reembeddedStems.has(s);
+      const title = flagged
+        ? ` title="Placed here using GlossBERT's freshly re-predicted top candidate senses, not the definition you accepted for this stem (came from ${sourceInfo.label})"`
+        : "";
+      return `
+      <label class="chip${flagged ? " " + sourceInfo.cssClass : ""}"${title}>
+        <input type="checkbox" class="stem-keep" value="${escapeHtml(s)}" checked> ${escapeHtml(s)}${flagged ? ' <span class="reembedded-flag">⚠</span>' : ""}
+      </label>`;
+    }).join("");
 
     const ngramChips = cluster.ngrams.map((g) => `
       <label class="chip">
         <input type="checkbox" class="ngram-keep" value="${escapeHtml(g)}" checked> ${escapeHtml(g)}
       </label>`).join("") || '<span class="hint">none</span>';
+
+    const reembeddedNote = reembeddedStems.size > 0
+      ? `<p class="meta reembedded-note ${sourceInfo.cssClass}">⚠ Stem(s) marked below were placed in this cluster using
+         GlossBERT's freshly re-predicted top candidate senses, not the definition you accepted for
+         them -- they came from ${sourceInfo.label}. Worth a closer look before accepting.</p>`
+      : "";
 
     card.innerHTML = `
       <label>Cluster name
@@ -434,6 +464,7 @@ function renderClusterReview(payload) {
         <button type="button" class="secondary remove-all-ngrams">Remove all n-grams</button>
         <button type="button" class="danger remove-cluster">Remove entire cluster</button>
       </div>
+      ${reembeddedNote}
       <p class="meta">Stems (uncheck to remove):</p>
       <div class="chip-list stems">${stemChips}</div>
       <p class="meta">N-grams (uncheck to remove):</p>

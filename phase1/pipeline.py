@@ -1017,7 +1017,7 @@ def build_stem_word_frequency_table(stem_occurrences):
     }
 
 
-def rename_clusters(cluster_dict, stem_word_frequencies):
+def rename_clusters(cluster_dict, stem_word_frequencies, reembedded_stems=frozenset(), reembedded_source=None):
     """Names each cluster after its single most-frequent observed word.
     Two unrelated clusters can easily share a dominant word (a corpus-wide
     high-frequency term like "trust" will top many different clusters'
@@ -1026,7 +1026,28 @@ def rename_clusters(cluster_dict, stem_word_frequencies):
     -- without it, a plain dict assignment here would silently overwrite an
     earlier same-named cluster and drop its stems entirely with no warning
     (verified on real Boisseau data: 6 of 20 raw noise clusters collided
-    this way, all lost, before this fix)."""
+    this way, all lost, before this fix).
+
+    reembedded_stems (from recluster_large_clusters/recluster_noise): the
+    subset of this cluster's own stems -- if any -- whose clustering
+    embedding was built from freshly re-predicted GlossBERT candidate
+    senses rather than the researcher's actual accepted/chosen definition
+    (see record_accepted_instance), since neither reclustering function
+    ever receives accepted_definitions. Recorded per cluster as
+    "reembedded_stems" so a researcher reviewing a cluster can see which
+    of its stems that applies to and weigh them accordingly.
+
+    reembedded_source ("main" or "noise"): which pool this ENTIRE call's
+    clusters came from -- always the same for every cluster produced by
+    one call, since a cluster is never a mix of main-pool and noise-pool
+    stems (they're disjoint until merge_named_clusters unifies naming
+    afterward, never stems). Recorded per cluster as "reembedded_source"
+    purely as an extra affordance: "main" (large-cluster re-split) and
+    "noise" (noise recovery) get different colors in the webapp/HTML
+    export, since a researcher may weigh the two differently -- a noise
+    recovery embedding always uses fresh GlossBERT senses, while a
+    large-cluster re-split only does so for the specific stems actually
+    moved into a new subcluster."""
     renamed = {}
     for label, stems in cluster_dict.items():
         cluster_word_counter = Counter()
@@ -1052,6 +1073,8 @@ def rename_clusters(cluster_dict, stem_word_frequencies):
             "stems": sorted(set(stems)),
             "top_frequency": max_freq,
             "top_words": top_words,
+            "reembedded_stems": sorted(set(stems) & reembedded_stems),
+            "reembedded_source": reembedded_source,
         }
     return renamed
 
@@ -1098,7 +1121,7 @@ def _split_oversized_clusters_once(clusters, stem_occurrences, embedder, tokeniz
     the wrapper's loop is for."""
     large_clusters = {label: stems for label, stems in clusters.items() if len(set(stems)) > max_cluster_size}
     if not large_clusters:
-        return dict(clusters), {}
+        return dict(clusters), {}, set()
 
     stem_to_parent_cluster = {stem: label for label, stems in large_clusters.items() for stem in stems}
     large_stems = sorted({stem for stems in large_clusters.values() for stem in stems})
@@ -1152,6 +1175,16 @@ def _split_oversized_clusters_once(clusters, stem_occurrences, embedder, tokeniz
 
     updated_clusters = dict(clusters)
     next_cluster_label = (max(updated_clusters.keys()) + 1) if updated_clusters else 0
+    # Stems actually MOVED into a newly created subcluster here -- not
+    # every stem in large_stems, since a parent that made no progress
+    # (len(subcluster_labels) <= 1) is left untouched below, still
+    # embedded from its original (accepted-definition-based) pass, not
+    # this function's fresh-GlossBERT-candidate-sense text. Surfaced to
+    # callers so they can flag these stems' clustering as based on
+    # freshly re-predicted senses, not the researcher's reviewed choice
+    # (see run_glossbert_analysis/record_accepted_instance) -- neither
+    # this function nor recluster_noise ever receives accepted_definitions.
+    reembedded_stems = set()
 
     for parent_label, subcluster_labels in parent_to_subclusters.items():
         if len(subcluster_labels) <= 1:
@@ -1159,9 +1192,10 @@ def _split_oversized_clusters_once(clusters, stem_occurrences, embedder, tokeniz
         updated_clusters.pop(parent_label, None)
         for subcluster_label in subcluster_labels:
             updated_clusters[next_cluster_label] = sorted(large_subclusters[subcluster_label])
+            reembedded_stems.update(large_subclusters[subcluster_label])
             next_cluster_label += 1
 
-    return updated_clusters, large_subclusters
+    return updated_clusters, large_subclusters, reembedded_stems
 
 
 def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, model, device,
@@ -1169,7 +1203,12 @@ def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, mo
                               min_cluster_len=3, max_synsets=5, max_passes=5):
     """Splits any cluster larger than max_cluster_size into finer-grained
     subclusters using richer (word + context + candidate-sense) text
-    representations. Returns (updated_clusters, all_subclusters).
+    representations. Returns (updated_clusters, all_subclusters, reembedded_stems)
+    -- reembedded_stems is every stem actually moved into a newly created
+    subcluster across all passes (see _split_oversized_clusters_once):
+    its cluster placement was decided from freshly re-predicted GlossBERT
+    candidate senses, not the researcher's reviewed/accepted definition,
+    since this function never receives accepted_definitions at all.
 
     Runs the splitting pass (_split_oversized_clusters_once) repeatedly
     rather than just once -- a single leaf-mode HDBSCAN pass is not
@@ -1192,6 +1231,7 @@ def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, mo
     rather than assume the cap was met."""
     updated_clusters = dict(clusters)
     all_subclusters = {}
+    reembedded_stems = set()
     current_min_clusters = min_clusters
     for pass_num in range(max_passes):
         if not find_oversized_clusters(updated_clusters, max_cluster_size):
@@ -1199,7 +1239,7 @@ def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, mo
         if current_min_clusters < min_cluster_len:
             break
 
-        next_clusters, subclusters = _split_oversized_clusters_once(
+        next_clusters, subclusters, pass_reembedded = _split_oversized_clusters_once(
             updated_clusters, stem_occurrences, embedder, tokenizer, model, device,
             pos_map=pos_map, max_cluster_size=max_cluster_size, min_clusters=current_min_clusters,
             min_cluster_len=min_cluster_len, max_synsets=max_synsets,
@@ -1212,11 +1252,12 @@ def recluster_large_clusters(clusters, stem_occurrences, embedder, tokenizer, mo
             continue
 
         updated_clusters = next_clusters
+        reembedded_stems.update(pass_reembedded)
         # HDBSCAN's own labels are only unique within one pass -- prefix
         # by pass number so successive passes' subclusters don't collide
         # and silently overwrite each other in the merged report dict.
         all_subclusters.update({f"{pass_num}.{label}": stems for label, stems in subclusters.items()})
-    return updated_clusters, all_subclusters
+    return updated_clusters, all_subclusters, reembedded_stems
 
 
 def find_oversized_clusters(clusters, max_cluster_size):
@@ -1406,6 +1447,16 @@ def attach_ngrams(renamed_clusters, cluster_ngrams):
 # INTERACTIVE CLUSTER REVIEW HELPERS
 # ============================================================
 
+def _describe_reembedded_source(reembedded_source):
+    """Human-readable label for a cluster's reembedded_source, distinguishing
+    the two mechanisms that bypass accepted_definitions -- see rename_clusters."""
+    if reembedded_source == "main":
+        return "large-cluster re-split"
+    if reembedded_source == "noise":
+        return "noise recovery"
+    return "a re-split/recovery pass"
+
+
 def print_cluster_for_review(cluster_name, cluster_data):
     print("\n----------------------------------")
     print(f"CLUSTER NAME: {cluster_name}")
@@ -1414,9 +1465,19 @@ def print_cluster_for_review(cluster_name, cluster_data):
         print("\nRepresentative n-grams:\n")
         for i, gram in enumerate(ngrams, 1):
             print(f"{i}. {gram}")
+    reembedded = set(cluster_data.get("reembedded_stems", []))
+    source_label = _describe_reembedded_source(cluster_data.get("reembedded_source"))
     print("\nSTEMS:")
     for i, stem in enumerate(cluster_data["stems"], 1):
-        print(f"{i}. {stem}")
+        flag = f"  [RE-EMBEDDED: {source_label} -- see note below]" if stem in reembedded else ""
+        print(f"{i}. {stem}{flag}")
+    if reembedded:
+        print(
+            f"\nNOTE: stem(s) marked RE-EMBEDDED above came from a {source_label} pass, which "
+            "placed them using GlossBERT's freshly re-predicted top candidate senses, not your "
+            "reviewed/accepted definition choice -- neither reclustering mechanism consults "
+            "accepted_definitions. Worth a closer look before accepting."
+        )
 
 
 def parse_index_selection(raw_input, items):
@@ -1498,6 +1559,8 @@ def run_cluster_review(renamed_clusters, decisions):
                 "ngrams": updated_ngrams,
                 "excluded_ngrams": removed_ngrams,
                 "excluded_stems": [],
+                "reembedded_stems": cluster_data.get("reembedded_stems", []),
+                "reembedded_source": cluster_data.get("reembedded_source"),
             }
             continue
 
@@ -1523,9 +1586,12 @@ def run_cluster_review(renamed_clusters, decisions):
         if new_name == "":
             new_name = cluster_name
 
+        reembedded = set(cluster_data.get("reembedded_stems", []))
+        source_label = _describe_reembedded_source(cluster_data.get("reembedded_source"))
         print("\nCurrent stems:")
         for i, stem in enumerate(stems, 1):
-            print(f"{i}. {stem}")
+            flag = f"  [RE-EMBEDDED: {source_label}]" if stem in reembedded else ""
+            print(f"{i}. {stem}{flag}")
 
         remove_input = input(
             "\nType stem numbers to remove "
@@ -1558,6 +1624,8 @@ def run_cluster_review(renamed_clusters, decisions):
             "ngrams": cluster_data.get("ngrams", []),
             "excluded_ngrams": removed_ngrams,
             "excluded_stems": removed_stems,
+            "reembedded_stems": [s for s in reembedded if s in updated_stems],
+            "reembedded_source": cluster_data.get("reembedded_source"),
         }
 
     print("\n======================")
@@ -1585,6 +1653,12 @@ def run_cluster_review(renamed_clusters, decisions):
             print("EXCLUDED STEMS:")
             print(", ".join(excluded))
 
+        reembedded = final_clusters[cluster_name].get("reembedded_stems", [])
+        if reembedded:
+            source_label = _describe_reembedded_source(final_clusters[cluster_name].get("reembedded_source"))
+            print(f"RE-EMBEDDED STEMS ({source_label}, not your accepted definition):")
+            print(", ".join(reembedded))
+
         print()
 
     return final_clusters, excluded_cluster_ngrams
@@ -1604,6 +1678,8 @@ def build_phase1_state(final_clusters, excluded_cluster_ngrams):
                 "ngrams": final_clusters[cluster_name].get("ngrams", []),
                 "excluded_stems": final_clusters[cluster_name].get("excluded_stems", []),
                 "excluded_ngrams": final_clusters[cluster_name].get("excluded_ngrams", []),
+                "reembedded_stems": final_clusters[cluster_name].get("reembedded_stems", []),
+                "reembedded_source": final_clusters[cluster_name].get("reembedded_source"),
             }
             for cluster_name in sorted(final_clusters.keys())
         ],
@@ -1628,15 +1704,37 @@ def _html_list(label, items, css=""):
     return f"<div{style}><strong>{label}:</strong> {joined}</div>"
 
 
+# reembedded_source -> (label, hex color) for build_cluster_html/the webapp's
+# matching CSS -- two distinct colors so a researcher can tell at a glance
+# which reclustering mechanism bypassed their accepted definition, since a
+# noise-recovery embedding is ALWAYS fresh-GlossBERT (100% of that cluster's
+# stems, by construction) while a large-cluster re-split only affects the
+# specific stems actually moved into a new subcluster.
+REEMBEDDED_SOURCE_STYLE = {
+    "main": ("⚠ Re-embedded via large-cluster re-split, not your accepted definition", "#b36b00"),
+    "noise": ("⚠ Re-embedded via noise recovery, not your accepted definition", "#6b4c9a"),
+}
+_REEMBEDDED_FALLBACK_STYLE = ("⚠ Re-embedded via GlossBERT re-prediction, not your accepted definition", "#b36b00")
+
+
 def build_cluster_html(final_clusters, corpus_name, tableau20=TABLEAU20):
     rows = []
     for i, cluster_name in enumerate(sorted(final_clusters.keys())):
         cluster_data = final_clusters[cluster_name]
         r, g, b = hex_to_rgb(tableau20[i % len(tableau20)])
 
+        reembedded_label, reembedded_color = REEMBEDDED_SOURCE_STYLE.get(
+            cluster_data.get("reembedded_source"), _REEMBEDDED_FALLBACK_STYLE
+        )
+
         content = (
             _html_list("Stems", cluster_data.get("stems", []))
             + _html_list("N-grams", cluster_data.get("ngrams", []), css="margin-top:8px;")
+            + _html_list(
+                reembedded_label,
+                cluster_data.get("reembedded_stems", []),
+                css=f"margin-top:6px;font-size:0.80em;color:{reembedded_color};font-weight:600;",
+            )
             + _html_list("Excluded stems", cluster_data.get("excluded_stems", []),
                          css="margin-top:6px;font-size:0.80em;color:#999;")
             + _html_list("Excluded n-grams", cluster_data.get("excluded_ngrams", []),
@@ -1655,6 +1753,25 @@ def build_cluster_html(final_clusters, corpus_name, tableau20=TABLEAU20):
     total_stems = sum(len(c.get("stems", [])) for c in final_clusters.values())
     total_ngrams = sum(len(c.get("ngrams", [])) for c in final_clusters.values())
 
+    # Static legend for the two reembedded colors -- only rendered when this
+    # run actually has at least one flagged stem anywhere, so a clean run
+    # doesn't carry an explanation for a color that never appears below.
+    any_reembedded = any(c.get("reembedded_stems") for c in final_clusters.values())
+    legend_html = ""
+    if any_reembedded:
+        _, main_color = REEMBEDDED_SOURCE_STYLE["main"]
+        _, noise_color = REEMBEDDED_SOURCE_STYLE["noise"]
+        legend_html = f"""
+<p style="font-size:0.85em;background:#f7f6f3;border-radius:6px;padding:6px 10px;">
+  <strong>Re-embedded stem colors:</strong>
+  <span style="color:{main_color};font-weight:600;">&#9873; large-cluster re-split</span>
+  &nbsp;&nbsp;
+  <span style="color:{noise_color};font-weight:600;">&#9873; noise recovery</span>
+  &mdash; these stems' clustering used GlossBERT's freshly re-predicted candidate senses,
+  not the definition you reviewed/accepted for them.
+</p>
+"""
+
     return f"""
 <h3>Semantic Clusters &mdash; Phase 1 Results</h3>
 
@@ -1665,7 +1782,7 @@ def build_cluster_html(final_clusters, corpus_name, tableau20=TABLEAU20):
   {total_ngrams} n-grams &middot;
   Tableau20 palette
 </p>
-
+{legend_html}
 <table style="border-collapse:collapse;font-family:serif;font-size:14px;">
   <thead>
     <tr>

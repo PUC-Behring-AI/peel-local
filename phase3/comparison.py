@@ -61,14 +61,9 @@ def build_comparison_section(source_doc, rate_docs, phase1_state, source_text, s
         parts.append(f"<h4>Cluster coverage &mdash; {rate}%</h4>")
         parts.append(build_coverage_table(coverage))
 
-    parts.append("<h4>Word clouds</h4>")
-    parts.append('<div style="display:flex;flex-wrap:wrap;gap:1rem;">')
-    for label, doc in documents:
-        parts.append(
-            f'<div style="flex:1 1 260px;"><p style="font-size:0.85em;color:#666;margin:0 0 4px;">{esc(label)}</p>'
-            + dr.build_wordcloud_html(doc.text, stopwords, width=320, height=200) + "</div>"
-        )
-    parts.append("</div>")
+    # Word clouds (source vs. each summary) used to be rendered here, but
+    # now appear earlier, in the Distant Reading section's own side-by-side
+    # comparison (phase3/pipeline.py::build_phase3_report) -- not repeated.
 
     if selected_pairs:
         parts.append("<h4>Contexts &mdash; selected collocation pair(s)</h4>")

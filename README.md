@@ -762,3 +762,13 @@ peel-local/
 two diagrams above. It's gitignored on purpose: the diagrams are the
 committed deliverable, not the code that builds them. Regenerate with
 `python docgraph/generate_all.py` after a pipeline change.)
+
+---
+
+## License
+
+PEEL-Local is released under the [Creative Commons Attribution 4.0
+International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+license -- see [LICENSE](LICENSE) for the full legal text. You are free to
+use, share, and adapt this work for any purpose, including commercially,
+as long as you give appropriate attribution.

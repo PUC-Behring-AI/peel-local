@@ -191,6 +191,14 @@
     <h2>Cluster review</h2>
     <p class="hint">Uncheck a stem or n-gram to remove it from its cluster, or use a cluster's "remove all
        stems"/"remove all n-grams" button. Rename a cluster by editing its name.</p>
+    <p id="cluster-review-legend" class="hint reembedded-legend hidden">
+      <strong>Re-embedded stem colors:</strong>
+      <span class="chip chip-reembedded-main">&#9873; large-cluster re-split</span>
+      <span class="chip chip-reembedded-noise">&#9873; noise recovery</span>
+      -- these stems' clustering used GlossBERT's freshly re-predicted candidate senses,
+      not the definition you reviewed/accepted for them. Only shown when at least one
+      stem in this run is actually flagged.
+    </p>
     <button type="button" class="primary submit-cluster-review">Submit decisions</button>
     <div id="cluster-review-list"></div>
     <button type="button" class="primary submit-cluster-review">Submit decisions</button>

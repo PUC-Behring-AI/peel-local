@@ -82,9 +82,8 @@ def build_reader_html(doc, clusterdefs, colors_by_cluster, stemmer, max_chars=20
             normalized = stem.rstrip("*").lower()
             stem_to_cluster.setdefault(normalized, {})[name] = color
         for gram in cluster.get("ngrams", []):
-            n = len(gram.split())
-            for i in pterms.term_positions(stems, lemmas, gram):
-                for k in range(i, i + n):
+            for span in pterms.term_match_spans(stems, lemmas, gram):
+                for k in span:
                     ngram_token_colors.setdefault(k, {})[name] = color
 
     tokens = list(doc)
@@ -114,6 +113,26 @@ def build_reader_html(doc, clusterdefs, colors_by_cluster, stemmer, max_chars=20
     body = f'<div style="white-space:pre-wrap;line-height:1.9;font-family:Georgia,serif;">{"".join(pieces)}</div>'
     note = f'<p><em>Text truncated at ~{max_chars:,} characters for report size.</em></p>' if truncated else ""
     return note + body
+
+
+# ============================================================
+# LAYOUT -- side-by-side comparison (source vs. condensation(s))
+# ============================================================
+
+def build_side_by_side_html(items, min_width="260px"):
+    """items: [(label, inner_html), ...]. Lays them out in the same
+    wrapping flex row comparison.py's per-rate word clouds already used,
+    one column per item with its label above. A single item is returned
+    unwrapped -- so a report with no approved condensation yet renders
+    exactly as it did before this existed, not inside a pointless
+    one-column flex container."""
+    if len(items) <= 1:
+        return items[0][1] if items else ""
+    cols = "".join(
+        f'<div style="flex:1 1 {min_width};"><p style="font-size:0.85em;color:#666;margin:0 0 4px;">{esc(label)}</p>{html}</div>'
+        for label, html in items
+    )
+    return f'<div style="display:flex;flex-wrap:wrap;gap:1rem;">{cols}</div>'
 
 
 # ============================================================
@@ -277,7 +296,17 @@ def build_term_stats_table(doc, clusterdefs, stemmer, n_bins=8, top_n=25):
     (kurtosis) and skewness of its per-segment frequency vector -- how
     concentrated vs. evenly spread, and front-loaded vs. back-loaded, the
     same two questions the retired CorpusTerms/Document Terms tool's
-    columns answered."""
+    columns answered.
+
+    Excludes any term with raw_freq <= 1, not just 0 -- a single
+    occurrence always lands in exactly one of the n_bins segments, which
+    is a degenerate (not just uninformative) distribution: its
+    peakedness/skewness come out identical for every freq-1 term
+    regardless of which segment that lone occurrence happened to land in,
+    so the shape columns carry no real signal there. This also keeps a
+    much shorter document (e.g. a heavy condensation) from having its
+    table dominated by a long tail of one-off mentions competing for
+    top_n slots against terms with an actual distribution to describe."""
     stems, lemmas = pterms.token_forms(doc, stemmer)
     total_tokens = len(stems)
     bin_size = max(1, math.ceil(total_tokens / n_bins)) if total_tokens else 1
@@ -288,7 +317,7 @@ def build_term_stats_table(doc, clusterdefs, stemmer, n_bins=8, top_n=25):
     for term in terms:
         positions = pterms.term_positions(stems, lemmas, term)
         raw_freq = len(positions)
-        if raw_freq == 0:
+        if raw_freq <= 1:
             continue
 
         per_bin = [0] * n_bins

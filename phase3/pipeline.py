@@ -72,24 +72,43 @@ def build_phase3_report(context, corpus_name, phase1_state, source_text, stemmer
                          condensed_texts, selected_pairs, nlp, n_bins=5):
     """condensed_texts: {rate: condensed_text} for every approved rate
     (may be empty -- the single-corpus Distant Reading section still
-    runs; only the Source-vs-Summary section is skipped). selected_pairs:
-    the researcher's already-resolved collocation-pair choice (possibly
-    empty). Returns the report's HTML string."""
+    runs, source-only; only the Source-vs-Summary section is skipped).
+    selected_pairs: the researcher's already-resolved collocation-pair
+    choice (possibly empty). Returns the report's HTML string."""
     clusterdefs = context["clusterdefs"]
     colors_by_cluster = context["colors_by_cluster"]
     source_doc = context["source_doc"]
     stopword_set = context["stopwords"]
 
+    # (label, text, doc) for Source + every approved condensation rate --
+    # built once, reused by every Distant Reading analysis below AND the
+    # Source-vs-Summary section, so a rate's text is only ever spaCy-parsed
+    # once. With no approved rate this is just [("Source", ...)], and
+    # dr.build_side_by_side_html below then returns each analysis
+    # unwrapped -- byte-for-byte the same report as before this feature.
+    rate_docs = [(rate, text, nlp(text)) for rate, text in sorted(condensed_texts.items())] if condensed_texts else []
+    documents = [("Source", source_text, source_doc)] + [
+        (f"Summary at {rate}%", text, doc) for rate, text, doc in rate_docs
+    ]
+
     reader_html = dr.build_reader_html(source_doc, clusterdefs, colors_by_cluster, stemmer)
-    wordcloud_html = dr.build_wordcloud_html(source_text, stopword_set)
-    bin_freqs = dr.bin_cluster_frequencies(source_text, clusterdefs, stemmer, n_bins)
-    trend_chart_html = dr.build_trend_chart_svg(bin_freqs, colors_by_cluster)
-    phrase_table_html = dr.build_phrase_table(source_doc, stopword_set)
-    term_stats_html = dr.build_term_stats_table(source_doc, clusterdefs, stemmer)
+    wordcloud_html = dr.build_side_by_side_html([
+        (label, dr.build_wordcloud_html(text, stopword_set, width=320, height=200))
+        for label, text, _doc in documents
+    ])
+    trend_chart_html = dr.build_side_by_side_html([
+        (label, dr.build_trend_chart_svg(dr.bin_cluster_frequencies(text, clusterdefs, stemmer, n_bins), colors_by_cluster))
+        for label, text, _doc in documents
+    ])
+    phrase_table_html = dr.build_side_by_side_html([
+        (label, dr.build_phrase_table(doc, stopword_set)) for label, _text, doc in documents
+    ])
+    term_stats_html = dr.build_side_by_side_html([
+        (label, dr.build_term_stats_table(doc, clusterdefs, stemmer)) for label, _text, doc in documents
+    ])
 
     comparison_html = ""
     if condensed_texts:
-        rate_docs = [(rate, text, nlp(text)) for rate, text in sorted(condensed_texts.items())]
         comparison_html = comparison.build_comparison_section(
             source_doc, rate_docs, phase1_state, source_text, stemmer, stopword_set, selected_pairs,
         )
