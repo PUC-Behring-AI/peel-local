@@ -4,7 +4,7 @@
 # TO FILL IN BEFORE PUBLICATION: `preferred-citation` has no journal, volume,
 # or DOI yet, because the paper is still in pre-submission revision. Add them
 # at acceptance, together with each author's ORCID, and bump `version` and
-# `date-released` if a later tag supersedes v1.0.0-paper.
+# `date-released` if a later tag supersedes v1.0.0.
 
 cff-version: 1.2.0
 message: >-
@@ -23,7 +23,7 @@ abstract: >-
 type: software
 license: Apache-2.0
 repository-code: https://github.com/PUC-Behring-AI/peel-local
-version: 1.0.0-paper
+version: 1.0.0
 date-released: 2026-09-15
 keywords:
   - AI-assisted summarization

@@ -4,7 +4,7 @@ Stdlib only -- no spaCy, no nltk, no network. These are the cheapest tests
 that lock a number the paper reports, so they run everywhere and first.
 
 A failure here is not a new baseline. It means a change moved an output that
-the paper's Table 2 reports, which under the `v1.0.0-paper` behaviour freeze
+the paper's Table 2 reports, which under the `v1.0.0` behaviour freeze
 makes it a failed change. See CONTRIBUTING.md.
 """
 
@@ -24,7 +24,7 @@ from phase2 import condense
 
 def test_committed_artifacts_are_unchanged():
     """Every pipeline artifact under data/ must still hash to what it hashed
-    at the v1.0.0-paper tag.
+    at the v1.0.0 tag.
 
     This is the backstop for the entire behaviour freeze: it catches an
     output moving even when no individual golden test below covers that

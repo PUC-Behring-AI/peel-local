@@ -2,7 +2,7 @@
 
 ## The one rule that is not negotiable: the behaviour freeze
 
-The tag `v1.0.0-paper` marks the commit whose outputs the accompanying paper
+The tag `v1.0.0` marks the commit whose outputs the accompanying paper
 reports. Everything under `data/` at that tag *is* the paper's evidence.
 
 **A change that moves a byte under `data/` is a failed change, not a new

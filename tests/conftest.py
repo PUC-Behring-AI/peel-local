@@ -2,7 +2,7 @@
 
 These tests assert what the pipeline does *today*, quirks included. That is
 deliberate: the artifacts under `data/` are the evidence the paper reports, so
-release work has to be provably byte-identical to the `v1.0.0-paper` tag. A
+release work has to be provably byte-identical to the `v1.0.0` tag. A
 golden test failing means an output moved -- which is a failed change, not a
 new baseline. See CONTRIBUTING.md for the tier system and for what to do when
 a Tier 2 test fails after a dependency bump (it usually means the environment

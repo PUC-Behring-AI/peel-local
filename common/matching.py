@@ -31,7 +31,7 @@ test would not.
 the implementations and the comparison; the call sites are unchanged and
 produce identical results, asserted by the golden tests under `tests/`.
 Unifying them on strategy 2 is tracked as L1 in `LIMITATIONS.md`, and waits
-behind the `v1.0.0-paper` behaviour freeze because it moves numbers the paper
+behind the `v1.0.0` behaviour freeze because it moves numbers the paper
 reports. The point of naming them first is that the fix then becomes a
 one-line change at two call sites, reviewable against a test that says
 exactly what moved.

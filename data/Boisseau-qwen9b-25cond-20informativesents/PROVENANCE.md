@@ -14,7 +14,7 @@
 | **DOI** | [10.1007/s11229-026-05484-2](https://doi.org/10.1007/s11229-026-05484-2) |
 | **Source licence** | Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0) |
 | **Retrieved** | Not recorded at the time of the run. The pipeline logged no acquisition date; this file states that rather than reconstructing one. |
-| **Redistribution permission** | Requested from the author and publisher; not yet granted. See the tracking issue linked from [`../../LIMITATIONS.md`](../../LIMITATIONS.md). |
+| **Redistribution permission** | Requested from the author and publisher; not yet granted. Tracked in [#1](https://github.com/PUC-Behring-AI/peel-local/issues/1). |
 
 **Neither of this repository's own licences covers this text.** The Apache-2.0
 licence in [`../../LICENSE`](../../LICENSE) covers the source code; the CC-BY-4.0

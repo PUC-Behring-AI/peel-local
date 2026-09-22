@@ -15,7 +15,7 @@ help:
 	@echo "make lint        -- ruff, errors only"
 	@echo "make docs        -- verify docs/ symbol references and FUNCTIONS.md coverage"
 	@echo "make test        -- pytest, excluding the slow tier"
-	@echo "make freeze-check-- verify data/ still matches the v1.0.0-paper hashes"
+	@echo "make freeze-check-- verify data/ still matches the v1.0.0 hashes"
 
 lint:
 	$(PYTHON) -m ruff check --select=F,E9 .

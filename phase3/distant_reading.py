@@ -189,7 +189,7 @@ def bin_cluster_frequencies(text, clusterdefs, stemmer, n_bins=5):
 
     This is a known defect, not a design choice -- see LIMITATIONS.md. It is
     left in place deliberately: changing it moves the numbers the paper's
-    Table 2 reports, so it waits behind the v1.0.0-paper behaviour freeze.
+    Table 2 reports, so it waits behind the v1.0.0 behaviour freeze.
     tests/test_tier1_golden.py pins the current totals so the fix lands as a
     visible diff."""
     words = text.split()

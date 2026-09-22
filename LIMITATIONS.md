@@ -5,7 +5,7 @@ a reader does not have to rediscover it.
 
 Every entry below is a defect that **changes an output**. That is why none of
 them is fixed yet: the artifacts under `data/` are the evidence the paper
-reports, and the `v1.0.0-paper` tag freezes them. Fixing any of these moves a
+reports, and the `v1.0.0` tag freezes them. Fixing any of these moves a
 number the paper cites, so each waits until the paper is published, and each
 has a characterisation test pinning today's behaviour first (see
 [CONTRIBUTING.md](CONTRIBUTING.md)) so its fix lands as a visible diff rather
@@ -22,6 +22,8 @@ post-submission audit of the code against the paper.
 ---
 
 ## L1 — Cluster n-grams are counted by raw substring search
+
+**Issue** [#9](https://github.com/PUC-Behring-AI/peel-local/issues/9)
 
 **Where** `phase2/condense.py::cluster_hit_counts`
 
@@ -56,6 +58,8 @@ Pinned by `tests/test_tier1_golden.py`.
 
 ## L2 — The adversarial reviewer's fix threshold is measured against the target, not the text
 
+**Issue** [#10](https://github.com/PUC-Behring-AI/peel-local/issues/10)
+
 **Where** `phase2/condense.py::run_adversarial_review`
 
 **What happens** A proposed fix is accepted only if
@@ -79,6 +83,8 @@ output that most needs review.
 ---
 
 ## L3 — Phase 0 can silently truncate the corpus, and logs nothing
+
+**Issue** [#11](https://github.com/PUC-Behring-AI/peel-local/issues/11)
 
 **Where** `phase0/clean_corpus.py::remove_end_sections`, and the absence of any
 `phase0_decisions.jsonl`
@@ -104,6 +110,8 @@ back to the cleaned text for source-metadata detection.
 
 ## L4 — Front-matter removal is bounded by a line offset, contrary to its own docstring
 
+**Issue** [#12](https://github.com/PUC-Behring-AI/peel-local/issues/12)
+
 **Where** `phase0/clean_corpus.py::remove_front_matter` and `scan_front_matter`
 
 **What happens** `scan_front_matter` scans the whole document and returns
@@ -123,6 +131,8 @@ beginning `Hardwig (1985)` is deleted.
 ---
 
 ## L5 — An oversized-cluster re-split can place the same stem in two clusters
+
+**Issue** [#13](https://github.com/PUC-Behring-AI/peel-local/issues/13)
 
 **Where** `phase1/pipeline.py::_split_oversized_clusters_once`
 
@@ -148,6 +158,8 @@ the duplicated one.
 
 ## L6 — Renaming two clusters to the same name silently drops one
 
+**Issue** [#14](https://github.com/PUC-Behring-AI/peel-local/issues/14)
+
 **Where** `phase1/pipeline.py::run_cluster_review` (CLI) and
 `webapp/pipeline_session.py::apply_cluster_review` (web)
 
@@ -166,6 +178,8 @@ not less.
 
 ## L7 — A flagged term nobody reviews disappears without record
 
+**Issue** [#15](https://github.com/PUC-Behring-AI/peel-local/issues/15)
+
 **Where** `webapp/pipeline_session.py::apply_flagged_term_review`, and
 `phase1/pipeline.py::run_flagged_term_review` in its "select from all terms"
 mode
@@ -179,6 +193,8 @@ analogous silent exclusion.
 ---
 
 ## L8 — `glossbert_accepted_terms.txt` is neither parseable nor reproducible
+
+**Issue** [#16](https://github.com/PUC-Behring-AI/peel-local/issues/16)
 
 **Where** `phase1/pipeline.py::save_glossbert_output`
 
@@ -195,6 +211,8 @@ artifact outright, so this one waits for publication rather than for a test.
 
 ## L9 — After escalation, legitimate source vocabulary is reported as hallucinated
 
+**Issue** [#17](https://github.com/PUC-Behring-AI/peel-local/issues/17)
+
 **Where** `phase2/condense.py::_check_invented_token_run`
 
 **What happens** The check compares the condensation's vocabulary against the
@@ -208,6 +226,8 @@ exactly the trials escalation produces.
 
 ## L10 — A typo in the CLI's condensation setup discards Phase 1's work
 
+**Issue** [#18](https://github.com/PUC-Behring-AI/peel-local/issues/18)
+
 **Where** `phase2/condense.py::run_condensation_setup`
 
 **What happens** `rates = [int(r) …]` and `max_trials = int(input(…))` are
@@ -219,6 +239,8 @@ input correctly (`webapp/app.py` returns a 400); only the CLI does not.
 ---
 
 ## L11 — The web interface has no CSRF protection
+
+**Issue** [#19](https://github.com/PUC-Behring-AI/peel-local/issues/19)
 
 **Where** `webapp/app.py`
 
@@ -238,6 +260,8 @@ that is preferred.
 ---
 
 ## L12 — Smaller things, grouped
+
+**Issue** [#20](https://github.com/PUC-Behring-AI/peel-local/issues/20)
 
 - `common/ollama_client.py::is_available` returns `True` for any HTTP
   response, including a 500.

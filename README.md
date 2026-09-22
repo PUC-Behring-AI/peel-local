@@ -114,7 +114,9 @@ statistics recompute from whatever text was accepted.
 **The committed example predates dependency pinning.** No library or model
 version was recorded when those artifacts were produced, and both models are
 loaded from Hugging Face `main` with no pinned revision. A rerun today may
-cluster differently. `requirements.txt` pins versions going forward.
+cluster differently. `requirements.txt` does **not** pin versions yet: a
+lock validated against the golden tests on a GPU machine is tracked in
+[#4](https://github.com/PUC-Behring-AI/peel-local/issues/4).
 
 **Phase 0 is destructive and unlogged.** `--clean` deletes everything from the
 first line matching `Notes`, `References` or `Bibliography` to the end of the
@@ -793,7 +795,7 @@ peel-local/
 ├── LICENSE-DOCS       # CC BY 4.0 -- covers docs, figures, generated reports
 ├── NOTICE             # copyright, and what the licences do NOT cover
 ├── CITATION.cff       # machine-readable citation metadata
-├── LIMITATIONS.md     # known defects, measured, each with its tracking issue
+├── LIMITATIONS.md     # known defects, measured, each with its issue number
 ├── CONTRIBUTING.md    # venv setup, the gate, and the behaviour-freeze rule
 ├── FUNCTIONS.md       # function-by-function map of the codebase
 ├── RUN_PIPELINE_GUIDE.md  # detailed run_pipeline.py CLI guide
@@ -840,10 +842,10 @@ the next section.
 
 ---
 
-## The `v1.0.0-paper` tag, and why it matters
+## The `v1.0.0` tag, and why it matters
 
-The tag [`v1.0.0-paper`](https://github.com/PUC-Behring-AI/peel-local/releases/tag/v1.0.0-paper)
-marks the exact commit whose outputs the paper reports. Everything under
+The tag `v1.0.0` (**not yet published** -- see
+[#8](https://github.com/PUC-Behring-AI/peel-local/issues/8)) will mark the exact commit whose outputs the paper reports. Everything under
 `data/` at that tag *is* the paper's evidence: Phase 1's 61 flagged terms
 and 11 final clusters, Phase 2's three condensations and their verification
 statistics, Phase 3's term-frequency tables.
@@ -880,6 +882,7 @@ Commons itself recommends against using them for code.
 states that Phase 0's cleaning removed the article's own copyright line
 along with the masthead; and tabulates how much of the source text persists
 in each derived artifact. Redistribution permission has been requested from
-the author and publisher and is tracked as an open issue. If you reuse
+the author and publisher and is tracked in
+[#1](https://github.com/PUC-Behring-AI/peel-local/issues/1). If you reuse
 anything from a `data/` directory, attribute the source work and observe
 its terms, not this repository's.
