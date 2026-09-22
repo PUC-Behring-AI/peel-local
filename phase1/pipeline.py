@@ -8,18 +8,40 @@ here as plain functions so the notebook cells stay short and the same
 logic isn't duplicated across cells.
 """
 
+import html as html_lib
 import json
 import math
 import re
 from collections import Counter
 
-import hdbscan
 import numpy as np
-import torch
 from nltk.corpus import wordnet as wn
-from sentence_transformers import SentenceTransformer
 from tqdm.auto import tqdm
-from transformers import BertForSequenceClassification, BertTokenizer
+
+from common import matching
+
+# Every other HTML-producing module in this codebase (phase2/condensation_report.py,
+# phase3/distant_reading.py, phase3/report.py, phase3/comparison.py,
+# common/standalone_report.py) escapes interpolated values this way; this one did
+# not, which made build_cluster_html below the only export that would render
+# wrongly on a cluster name, stem or n-gram containing & < > " '. No committed
+# corpus contains one, so adding it changes no existing artifact -- asserted by
+# tests/test_tier0_golden.py::test_cluster_html_reproduces_committed_export, which
+# regenerates all three committed exports and compares them byte for byte.
+esc = html_lib.escape
+
+# hdbscan, torch, transformers and sentence_transformers are imported lazily,
+# inside the four functions that actually use them -- same pattern, and the
+# same reason, as common/file_convert.py's lazy `from pypdf import PdfReader`.
+#
+# Most of this module is string and dictionary work: stem extraction, n-gram
+# mining, cluster naming and review, state/HTML export. None of it needs a
+# GPU stack, but a module-level import made the whole file unimportable
+# without one -- so inspecting build_cluster_html, or running the pure-Python
+# tests that lock Phase 1's HTML export, required installing torch and a
+# compiled hdbscan first. Deferring the imports changes nothing about a
+# successful run (the same modules load, on first use instead of at import)
+# and only changes *when* a missing dependency is reported.
 
 POS_MAP = {
     "NOUN": wn.NOUN,
@@ -84,6 +106,8 @@ TABLEAU20 = [
 def load_glossbert(model_id: str = DEFAULT_GLOSSBERT_MODEL, device="cpu"):
     """Loads GlossBERT from the Hugging Face Hub (cached locally after the
     first call) -- no manual checkpoint download/placement needed."""
+    from transformers import BertForSequenceClassification, BertTokenizer
+
     tokenizer = BertTokenizer.from_pretrained(model_id)
     model = BertForSequenceClassification.from_pretrained(model_id)
     model.to(device)
@@ -181,6 +205,8 @@ def _window_around_match(sentence, match_start, match_end, max_words_each_side):
 
 
 def glossbert_predict(occurrence, tokenizer, model, device, pos_map=POS_MAP, max_synsets=5):
+    import torch
+
     word = occurrence["word"]
     pos = occurrence["pos"]
     sentence = occurrence["sentence"]
@@ -259,6 +285,8 @@ def glossbert_predict_merged(word, occurrences, tokenizer, model, device, pos_ma
     least some surrounding context and its quote-marking, rather than
     later occurrences in the join order being silently dropped by tail-
     truncation once the paragraph runs long."""
+    import torch
+
     pos = occurrences[0]["pos"]
     wn_pos = pos_map.get(pos)
 
@@ -964,6 +992,8 @@ def build_stem_embeddings(accepted_definitions, embedder_name):
     text over its instances), not one point per instance -- otherwise a
     stem with many accepted instances gets that many points in the HDBSCAN
     input and can out-vote its own density requirement."""
+    from sentence_transformers import SentenceTransformer
+
     embedder = SentenceTransformer(embedder_name)
 
     stem_names = []
@@ -993,6 +1023,8 @@ def cluster_stem_embeddings(embeddings, stem_names, min_cluster_size, min_cluste
     dissolved back into noise (label -1), same threshold the recluster
     steps already enforce, so it flows into extract_noise_stems/
     recluster_noise for a second attempt or manual merging in review."""
+    import hdbscan
+
     labels = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size).fit_predict(embeddings)
 
     clusters = {}
@@ -1155,6 +1187,8 @@ def _split_oversized_clusters_once(clusters, stem_occurrences, embedder, tokeniz
         large_texts.append(prefix + " ".join(contexts) + suffix)
         large_stem_names.append(stem)
 
+    import hdbscan
+
     large_embeddings = embedder.encode(large_texts, convert_to_numpy=True, normalize_embeddings=True)
     large_labels = hdbscan.HDBSCAN(
         min_cluster_size=min_clusters, min_samples=1, cluster_selection_method="leaf",
@@ -1296,6 +1330,8 @@ def recluster_noise(noise_stems, stem_occurrences, embedder, tokenizer, model, d
     if not noise_texts:
         return {}
 
+    import hdbscan
+
     noise_embeddings = embedder.encode(noise_texts, normalize_embeddings=True, convert_to_numpy=True)
     noise_labels = hdbscan.HDBSCAN(min_cluster_size=min_clusters).fit_predict(noise_embeddings)
 
@@ -1337,16 +1373,15 @@ def build_sentence_token_cache(nlp, accepted_definitions, stemmer, use_lemmas=Tr
 
 
 def normalize_cluster_stem(stem, stemmer, use_lemmas):
-    stem = stem.rstrip("*").lower()
-    return stem if use_lemmas else stemmer.stem(stem)
+    return matching.normalize_cluster_term(stem, stemmer, use_lemmas)
 
 
 def token_matches_cluster_stem(token, stems, stemmer, use_lemmas):
-    for stem in stems:
-        normalized = normalize_cluster_stem(stem, stemmer, use_lemmas)
-        if token == normalized or token.startswith(normalized) or normalized.startswith(token):
-            return True
-    return False
+    """Bidirectional-prefix stem matching -- strategy 1 of the three this
+    pipeline uses. See common/matching.py for what the other two are, where
+    each is used, and why they disagree. Behaviour here is unchanged; the
+    implementation simply lives in one named place now."""
+    return matching.stem_prefix_match(token, stems, stemmer, use_lemmas)
 
 
 def build_global_ngram_statistics(sentence_cache, min_n=2, max_n=3, min_global_count=2, percentile=95):
@@ -1699,9 +1734,9 @@ def hex_to_rgb(h):
 def _html_list(label, items, css=""):
     if not items:
         return ""
-    joined = ", ".join(f"<code>{item}</code>" for item in items)
+    joined = ", ".join(f"<code>{esc(item)}</code>" for item in items)
     style = f' style="{css}"' if css else ""
-    return f"<div{style}><strong>{label}:</strong> {joined}</div>"
+    return f"<div{style}><strong>{esc(label)}:</strong> {joined}</div>"
 
 
 # reembedded_source -> (label, hex color) for build_cluster_html/the webapp's
@@ -1745,7 +1780,7 @@ def build_cluster_html(final_clusters, corpus_name, tableau20=TABLEAU20):
             "    <tr>\n"
             '      <td style="padding:5px 12px 5px 0;">&nbsp;</td>\n'
             f'      <td style="padding:5px 12px 5px 0;color:rgb({r},{g},{b});'
-            f'font-weight:bold;vertical-align:top;">{cluster_name}</td>\n'
+            f'font-weight:bold;vertical-align:top;">{esc(cluster_name)}</td>\n'
             f'      <td style="padding:5px 0;font-size:0.88em;color:#555;">{content}</td>\n'
             "    </tr>"
         )
@@ -1776,7 +1811,7 @@ def build_cluster_html(final_clusters, corpus_name, tableau20=TABLEAU20):
 <h3>Semantic Clusters &mdash; Phase 1 Results</h3>
 
 <p style="font-style:italic;color:#666;font-size:0.9em;">
-  {corpus_name} &mdash;
+  {esc(corpus_name)} &mdash;
   {len(final_clusters)} clusters &middot;
   {total_stems} stems &middot;
   {total_ngrams} n-grams &middot;

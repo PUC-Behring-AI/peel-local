@@ -15,18 +15,34 @@ Also importable (used by phase0.ipynb and run_pipeline.py):
 import re
 import argparse
 from collections import Counter
+from functools import lru_cache
 
-import nltk
-from nltk.corpus import wordnet as wn
 
-# Download WordNet if necessary
-try:
-    wn.ensure_loaded()
-except LookupError:
-    nltk.download("wordnet")
-    nltk.download("omw-1.4")
+@lru_cache(maxsize=1)
+def _wordnet_lemmas():
+    """Every WordNet lemma, lowercased -- loaded on first use, not at import.
 
-WORDNET = set(w.lower() for w in wn.all_lemma_names())
+    This used to run at module scope, which meant that simply importing this
+    module (as run_pipeline.py does unconditionally, whether or not --clean
+    was passed) loaded the whole WordNet lemma inventory and, if it was
+    missing, made a network call to download it. Importing a module should not
+    fetch data; and it made the fast test tiers impossible, since they cannot
+    assume a network.
+
+    Only split_juxtaposed_words consults this, so nothing else pays for it.
+    Cached, so a repeated call inside one run costs nothing. Same results as
+    before -- only the moment of loading changed.
+    """
+    import nltk
+    from nltk.corpus import wordnet as wn
+
+    try:
+        wn.ensure_loaded()
+    except LookupError:
+        nltk.download("wordnet")
+        nltk.download("omw-1.4")
+
+    return {w.lower() for w in wn.all_lemma_names()}
 
 
 # ---------------------------------------------------------------------
@@ -93,6 +109,8 @@ def split_juxtaposed_words(text):
     whenever both parts are valid words.
     """
 
+    wordnet = _wordnet_lemmas()
+
     tokens = re.findall(r"\b[A-Za-z]{8,}\b", text)
 
     replacements = {}
@@ -101,7 +119,7 @@ def split_juxtaposed_words(text):
 
         lower = token.lower()
 
-        if lower in WORDNET:
+        if lower in wordnet:
             continue
 
         for i in range(3, len(lower)-3):
@@ -109,7 +127,7 @@ def split_juxtaposed_words(text):
             left = lower[:i]
             right = lower[i:]
 
-            if left in WORDNET and right in WORDNET:
+            if left in wordnet and right in wordnet:
                 replacements[token] = token[:i] + " " + token[i:]
                 break
 

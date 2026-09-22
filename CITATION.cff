@@ -1,0 +1,72 @@
+# Citation metadata for PEEL-Local (Citation File Format 1.2.0).
+# https://citation-file-format.github.io
+#
+# TO FILL IN BEFORE PUBLICATION: `preferred-citation` has no journal, volume,
+# or DOI yet, because the paper is still in pre-submission revision. Add them
+# at acceptance, together with each author's ORCID, and bump `version` and
+# `date-released` if a later tag supersedes v1.0.0-paper.
+
+cff-version: 1.2.0
+message: >-
+  If you use PEEL-Local, please cite the paper below rather than only the
+  software. If you reproduce or build on a specific run's artifacts, also
+  cite the software version whose tag produced them.
+title: PEEL-Local
+abstract: >-
+  A modular, auditable architecture for researcher-governed AI-assisted text
+  summarization. Runs a four-phase local pipeline -- corpus cleaning; WordNet
+  and GlossBERT word-sense disambiguation with sentence-transformer/HDBSCAN
+  semantic clustering; lexical-density sentence selection with locally-hosted
+  LLM condensation and independent adversarial review; and self-contained
+  distant-reading analysis -- in which every interpretive decision is both an
+  interactive prompt and a logged, timestamped audit record.
+type: software
+license: Apache-2.0
+repository-code: https://github.com/PUC-Behring-AI/peel-local
+version: 1.0.0-paper
+date-released: 2026-09-15
+keywords:
+  - AI-assisted summarization
+  - epistemic control
+  - human-in-the-loop
+  - natural language processing
+  - word sense disambiguation
+  - distant reading
+
+authors:
+  - family-names: Miranda e Silva
+    given-names: João Victor
+    affiliation: >-
+      PUC-Behring Institute of Artificial Intelligence, Pontifícia
+      Universidade Católica do Rio de Janeiro (PUC-Rio), Rio de Janeiro, Brazil
+  - family-names: de Souza
+    given-names: Clarisse
+    affiliation: >-
+      PUC-Behring Institute of Artificial Intelligence, Pontifícia
+      Universidade Católica do Rio de Janeiro (PUC-Rio), Rio de Janeiro, Brazil
+  - family-names: Souza
+    given-names: Anaximandro
+    affiliation: >-
+      PUC-Behring Institute of Artificial Intelligence, Pontifícia
+      Universidade Católica do Rio de Janeiro (PUC-Rio), Rio de Janeiro, Brazil
+  - family-names: Cerqueira
+    given-names: Renato
+    affiliation: >-
+      PUC-Behring Institute of Artificial Intelligence, Pontifícia
+      Universidade Católica do Rio de Janeiro (PUC-Rio), Rio de Janeiro, Brazil
+
+preferred-citation:
+  type: article
+  title: >-
+    PEEL-Local: A Modular, Auditable Architecture for Researcher-Governed
+    AI-Assisted Text Summarization
+  year: 2026
+  authors:
+    - family-names: Miranda e Silva
+      given-names: João Victor
+    - family-names: de Souza
+      given-names: Clarisse
+    - family-names: Souza
+      given-names: Anaximandro
+    - family-names: Cerqueira
+      given-names: Renato

@@ -23,16 +23,16 @@ Usage:
 """
 
 import argparse
+import os
 import tempfile
 from pathlib import Path
 
-import spacy
 import torch
 from nltk.stem import PorterStemmer
 
 from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import standalone_report, file_convert, parameter_sweep, resume
+from common import standalone_report, file_convert, limits, parameter_sweep, resume
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
@@ -199,11 +199,15 @@ def run_phase1(args, paths, decisions):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\nUsing device: {device}")
 
-    nlp = spacy.load(args.lang_model)
+    nlp = limits.load_spacy(args.lang_model)
     stemmer = PorterStemmer()
 
     with open(paths.raw_txt(), "r", encoding="utf-8") as f:
         text = f.read()
+
+    size_note = limits.describe_corpus_size(text)
+    if size_note:
+        print(f"\n{size_note}")
 
     doc = nlp(text)
 
@@ -443,8 +447,18 @@ def edit_prompt_via_tempfile(default_prompt):
     """Writes the rendered default condensation prompt to a scratch file,
     tells the researcher to open/edit/save it in their own editor, waits
     for ENTER, then reads it back -- avoids needing multi-line terminal
-    input for what can be a long, multi-paragraph prompt."""
-    edit_path = Path(tempfile.gettempdir()) / "peel_condensation_prompt.txt"
+    input for what can be a long, multi-paragraph prompt.
+
+    Uses mkstemp rather than a fixed name in the shared temp directory. The
+    prompt contains substantial verbatim corpus content (every informative
+    sentence), and the old fixed path was world-readable on Linux and
+    predictable, so on a multi-user machine another account could read the
+    corpus out of it -- or replace the file between the write and the
+    read-back, and have its own text sent to the model as the researcher's
+    prompt. mkstemp creates the file with 0600 and an unguessable name."""
+    fd, edit_name = tempfile.mkstemp(prefix="peel_condensation_prompt_", suffix=".txt")
+    os.close(fd)
+    edit_path = Path(edit_name)
     edit_path.write_text(default_prompt, encoding="utf-8")
     print(
         f"\nDefault prompt written to:\n  {edit_path}\n"
@@ -714,8 +728,12 @@ def _load_resume_state(args, paths):
         text = f.read()
     phase1_state = phase2_pipeline.load_phase1_state(paths.phase1_state_json())
 
+    size_note = limits.describe_corpus_size(text)
+    if size_note:
+        print(f"\n{size_note}")
+
     lang_model = resume.find_last_decision_choice(args.corpus, "phase1", "lang_model_choice") or args.lang_model
-    nlp = spacy.load(lang_model)
+    nlp = limits.load_spacy(lang_model)
     stemmer = PorterStemmer()
     return phase1_state, nlp, stemmer, text
 

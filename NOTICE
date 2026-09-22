@@ -1,0 +1,38 @@
+PEEL-Local
+Copyright 2026 PUC-Behring Institute of Artificial Intelligence,
+Pontifícia Universidade Católica do Rio de Janeiro (PUC-Rio)
+
+This product includes software developed at the PUC-Behring Institute of
+Artificial Intelligence (https://github.com/PUC-Behring-AI).
+
+The source code in this repository is licensed under the Apache License,
+Version 2.0 (see LICENSE). Documentation, figures, and the generated HTML
+reports under data/ are licensed under Creative Commons Attribution 4.0
+International (see LICENSE-DOCS).
+
+--------------------------------------------------------------------------
+Third-party corpus material
+--------------------------------------------------------------------------
+
+Neither licence above applies to the example corpus text under
+data/*/raw/ or to the passages of it reproduced inside the derived
+artifacts in the same directories. That text is a third-party work,
+redistributed here under its own separate terms. See the PROVENANCE.md
+file in each data/<corpus>/ directory for its title, authorship, DOI, and
+licence.
+
+--------------------------------------------------------------------------
+Third-party models
+--------------------------------------------------------------------------
+
+PEEL-Local loads, but does not redistribute, the following models. Each
+carries its own licence:
+
+  - GlossBERT (jvomiranda/GlossBERT_Checkpoint, Hugging Face Hub) --
+    after Huang et al. (2019), "GlossBERT: BERT for Word Sense
+    Disambiguation with Gloss Knowledge".
+  - sentence-transformers/all-MiniLM-L6-v2 (Hugging Face Hub).
+  - spaCy language models (en_core_web_sm by default).
+  - WordNet (Princeton University) via NLTK.
+  - Whichever model the researcher selects under Ollama for Phase 2
+    condensation and adversarial review.
