@@ -23,11 +23,16 @@ import math
 from collections import Counter
 from io import BytesIO
 
-from scipy.stats import kurtosis, skew
-from wordcloud import WordCloud
-
-from phase2.condense import FUNCTION_WORD_SET, _cluster_hit_counts
+from phase2.condense import FUNCTION_WORD_SET, cluster_hit_counts
 from phase3 import terms as pterms
+
+# scipy.stats and wordcloud are imported lazily, inside the two builders that
+# use them (build_term_stats_table and build_wordcloud_html). Every other
+# builder here -- the reader, the trend chart, the phrase table, the
+# concordances, the collocates table -- is string and counting work, so a
+# module-level import meant none of them could be imported or tested without
+# a SciPy build and a Pillow-backed wordcloud installed. Same pattern and
+# reason as common/file_convert.py's lazy pypdf import.
 
 esc = html_lib.escape
 
@@ -140,6 +145,8 @@ def build_side_by_side_html(items, min_width="260px"):
 # ============================================================
 
 def build_wordcloud_html(text, stopwords, width=700, height=350, max_words=100):
+    from wordcloud import WordCloud
+
     if not text.strip():
         return "<p><em>No text to render.</em></p>"
     wc = WordCloud(
@@ -165,10 +172,26 @@ def build_wordcloud_html(text, stopwords, width=700, height=350, max_words=100):
 # ============================================================
 
 def bin_cluster_frequencies(text, clusterdefs, stemmer, n_bins=5):
-    """Splits text into n_bins equal-length word segments and counts
-    each cluster's stem/n-gram hits per segment, reusing
-    phase2/condense.py's own _cluster_hit_counts so this agrees with how
-    the rest of the pipeline already counts cluster-term occurrences."""
+    """Splits text into n_bins equal-length word segments and counts each
+    cluster's stem/n-gram hits per segment, reusing phase2/condense.py's
+    cluster_hit_counts -- so this chart agrees with Phase 2's cluster-coverage
+    table.
+
+    It therefore *disagrees* with the rest of Phase 3, which is worth knowing
+    before reading the two side by side. `cluster_hit_counts` matches a stem
+    exactly but an n-gram by raw substring; every other builder in this module
+    goes through `phase3/terms.py`, which matches an n-gram against the
+    lemmatised, stopword-filtered token stream Phase 1 actually mined it from.
+    Since a mined n-gram usually has no literal occurrence (22 of 33 in the
+    committed example corpus count zero this way), the trend chart understates
+    a cluster's n-gram contribution while the term-frequency table in the same
+    report does not.
+
+    This is a known defect, not a design choice -- see LIMITATIONS.md. It is
+    left in place deliberately: changing it moves the numbers the paper's
+    Table 2 reports, so it waits behind the v1.0.0 behaviour freeze.
+    tests/test_tier1_golden.py pins the current totals so the fix lands as a
+    visible diff."""
     words = text.split()
     if not words:
         return {c["name"]: [0] * n_bins for c in clusterdefs}
@@ -178,7 +201,7 @@ def bin_cluster_frequencies(text, clusterdefs, stemmer, n_bins=5):
 
     freqs = {c["name"]: [] for c in clusterdefs}
     for bin_text in raw_bins:
-        hits = _cluster_hit_counts(bin_text, clusterdefs, stemmer)
+        hits = cluster_hit_counts(bin_text, clusterdefs, stemmer)
         for name, count in hits.items():
             freqs[name].append(count)
     return freqs
@@ -307,6 +330,8 @@ def build_term_stats_table(doc, clusterdefs, stemmer, n_bins=8, top_n=25):
     much shorter document (e.g. a heavy condensation) from having its
     table dominated by a long tail of one-off mentions competing for
     top_n slots against terms with an actual distribution to describe."""
+    from scipy.stats import kurtosis, skew
+
     stems, lemmas = pterms.token_forms(doc, stemmer)
     total_tokens = len(stems)
     bin_size = max(1, math.ceil(total_tokens / n_bins)) if total_tokens else 1

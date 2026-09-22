@@ -27,7 +27,7 @@ call site, so there is exactly one place per prompt to read or change it.
 | | |
 |---|---|
 | **Function** | `glossbert_predict(occurrence, tokenizer, model, device, pos_map, max_synsets)` |
-| **File** | [`phase1/pipeline.py:111`](../phase1/pipeline.py) |
+| **File** | [`phase1/pipeline.py::glossbert_predict`](../phase1/pipeline.py) |
 | **Called from** | `run_glossbert_analysis` (same file), once per sampled occurrence |
 | **Model** | GlossBERT (`jvomiranda/GlossBERT_Checkpoint`, Hugging Face; default -- user-configurable via `--glossbert-model`/`GLOSSBERT_MODEL_ID`/webapp field) |
 | **Workflow step** | Phase 1, "GlossBERT WSD inference" -- runs once GlossBERT is loaded and stem occurrences are mapped to sentences, before flagged-term review |
@@ -62,7 +62,7 @@ intact. GlossBERT was disambiguating the dropped words with zero local
 context.
 
 Fix (`_glossbert_words_budget` + `_window_around_match`,
-[`phase1/pipeline.py:82-108`](../phase1/pipeline.py)): instead of the
+[`phase1/pipeline.py::_glossbert_words_budget`](../phase1/pipeline.py)): instead of the
 whole sentence, feed a **word-based window centered on the target word**.
 The window size is computed once per occurrence from the *longest*
 candidate gloss among the synsets being scored (so every candidate sense
@@ -152,7 +152,7 @@ pair, the real one -- instead of two indistinguishable pairs.
 | | |
 |---|---|
 | **Function** | `glossbert_predict_merged(word, occurrences, tokenizer, model, device, pos_map, max_synsets)` |
-| **File** | [`phase1/pipeline.py:161`](../phase1/pipeline.py) |
+| **File** | [`phase1/pipeline.py::glossbert_predict_merged`](../phase1/pipeline.py) |
 | **Called from** | `run_glossbert_analysis`, once per distinct word (instead of once per occurrence) when `merge_duplicate_word_occurrences=True` |
 | **Model** | Same GlossBERT checkpoint as above |
 | **Workflow step** | Phase 1, "GlossBERT WSD inference" -- opt-in alternative to the per-occurrence path, toggled at Phase 1 setup (`--merge-duplicate-word-occurrences` / `MERGE_DUPLICATE_WORD_OCCURRENCES` / webapp checkbox) |
@@ -195,7 +195,7 @@ enough out that it no longer bites for realistic occurrence counts.
 | | |
 |---|---|
 | **Function** | `build_condensation_prompt(ordered_sentences, cluster_key_terms, target_words, corpus_name, source_text=None)` |
-| **File** | [`phase2/condense.py:128`](../phase2/condense.py) |
+| **File** | [`phase2/condense.py::build_condensation_prompt`](../phase2/condense.py) |
 | **Called from** | `attempt_condensation_trials`, once per generation trial (up to `max_trials` times per rate, plus again on escalation with `source_text` supplied) |
 | **Model** | User-selected Ollama model (`--ollama-model` / `OLLAMA_MODEL` / webapp field; no fixed default -- whatever's installed locally) |
 | **Workflow step** | Phase 2, "Generation trials & sanity checks" (and its escalated retry) |
@@ -235,7 +235,7 @@ Return only the condensed text, with no preamble or commentary.
 
 `sentences_block` is `- {sentence}` per informative sentence;
 `terms_block` is `- {cluster_name}: {top 15 terms}` per cluster.
-`estimate_num_ctx` (`condense.py:112`) sizes the Ollama context window from
+`estimate_num_ctx` (`phase2/condense.py::estimate_num_ctx`) sizes the Ollama context window from
 this prompt's length; it doesn't add to the prompt text itself.
 
 ### Adversarial review prompt
@@ -243,7 +243,7 @@ this prompt's length; it doesn't add to the prompt text itself.
 | | |
 |---|---|
 | **Function** | `build_adversarial_review_prompt(condensed_text, ordered_sentences, target_words, corpus_name)` |
-| **File** | [`phase2/condense.py:263`](../phase2/condense.py) |
+| **File** | [`phase2/condense.py::build_adversarial_review_prompt`](../phase2/condense.py) |
 | **Called from** | `run_adversarial_review`, once per rate, after a trial is accepted and before it's saved |
 | **Model** | User-selected Ollama model, independent from the generation model (`--adversarial-model` / `ADVERSARIAL_MODEL` / webapp field; defaults to the generation model if left unset) |
 | **Workflow step** | Phase 2, "Adversarial review & save" -- the last thing that happens to a condensation's text before it's persisted and used by every downstream step |
@@ -292,7 +292,7 @@ text kept) -- see `run_adversarial_review`'s degeneracy guard.
 | | |
 |---|---|
 | **Function** | `extract_source_metadata(source_text, model, embedder_name="all-MiniLM-L6-v2", top_k=5, host=, lead_chunks=3)` |
-| **File** | [`phase2/condense.py:532`](../phase2/condense.py) |
+| **File** | [`phase2/condense.py::extract_source_metadata`](../phase2/condense.py) |
 | **Called from** | `run_source_metadata_setup`, when the researcher opts to let the LLM determine title/author(s)/date rather than typing them in |
 | **Model** | Same Ollama model chosen for condensation generation (metadata extraction has no separate model choice); retrieval uses `all-MiniLM-L6-v2` (Sentence-BERT, fixed, not user-configurable) |
 | **Workflow step** | Phase 2, "Condensation & source setup" |
@@ -346,7 +346,7 @@ stem `system` (287 tokens) lost its entire "Candidate senses" section;
 `observ` (271 tokens) kept only a few words of its first definition.
 
 Fix: `_fit_contexts_to_budget(tokenizer, max_seq_length, fixed_parts,
-contexts)` ([`phase1/pipeline.py:696-741`](../phase1/pipeline.py))
+contexts)` ([`phase1/pipeline.py::_fit_contexts_to_budget`](../phase1/pipeline.py))
 replaces a fixed, corpus-derived word-count cap with one computed **from
 the actual text at call time**, so it fits the source in front of it
 rather than one particular corpus's measured statistics:
@@ -411,7 +411,7 @@ the same defensive fix for consistency.
 | | |
 |---|---|
 | **Function** | `build_stem_embeddings(accepted_definitions, embedder_name)` |
-| **File** | [`phase1/pipeline.py:710`](../phase1/pipeline.py) |
+| **File** | [`phase1/pipeline.py::build_stem_embeddings`](../phase1/pipeline.py) |
 | **Called from** | Phase 1, "Save senses, embed & initial cluster" -- right after flagged-term review, before the first HDBSCAN pass |
 | **Model** | Sentence-BERT (`SENTENCE_EMBEDDER`, default `all-MiniLM-L6-v2`, user-configurable via `--sentence-embedder`/`SENTENCE_EMBEDDER`/webapp field) |
 
@@ -442,7 +442,7 @@ produces one L2-normalized vector per stem, fed straight to
 | | |
 |---|---|
 | **Function** | `_split_oversized_clusters_once(clusters, stem_occurrences, embedder, tokenizer, model, device, ...)` |
-| **File** | [`phase1/pipeline.py:823`](../phase1/pipeline.py) |
+| **File** | [`phase1/pipeline.py::_split_oversized_clusters_once`](../phase1/pipeline.py) |
 | **Called from** | `recluster_large_clusters`, Phase 1 "Recursive cluster refinement" |
 | **Model** | Same Sentence-BERT model |
 
@@ -466,7 +466,7 @@ truncation.
 | | |
 |---|---|
 | **Function** | `recluster_noise(noise_stems, stem_occurrences, embedder, tokenizer, model, device, ...)` |
-| **File** | [`phase1/pipeline.py:970`](../phase1/pipeline.py) |
+| **File** | [`phase1/pipeline.py::recluster_noise`](../phase1/pipeline.py) |
 | **Called from** | Phase 1, "Recursive cluster refinement" (stems HDBSCAN's first pass discarded as noise) |
 | **Model** | Same Sentence-BERT model |
 
@@ -496,7 +496,7 @@ as the two stem-aggregated templates above.
 | | |
 |---|---|
 | **Function** | `extract_source_metadata(source_text, model, embedder_name="all-MiniLM-L6-v2", top_k=5, ...)` |
-| **File** | [`phase2/condense.py:557,559,560`](../phase2/condense.py) |
+| **File** | [`phase2/condense.py::extract_source_metadata`](../phase2/condense.py) |
 | **Called from** | Phase 2, "Condensation & source setup" |
 | **Model** | `all-MiniLM-L6-v2` (fixed, not user-configurable here) |
 

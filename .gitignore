@@ -2,6 +2,14 @@ __pycache__/
 *.pyc
 
 .ipynb_checkpoints/
+.pytest_cache/
+.venv/
+venv/
+
+# Git worktrees cut from this repo live here (see CONTRIBUTING.md). The
+# opt-in files beside them -- .claude/portao, .claude/issue-vizinhas -- are
+# committed on purpose, so this ignores the worktrees directory only.
+.claude/worktrees/
 
 # GlossBERT is now fetched from the Hugging Face Hub (jvomiranda/GlossBERT_Checkpoint);
 # a local checkpoint folder is no longer required. Ignored defensively in case one is

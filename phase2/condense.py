@@ -30,11 +30,17 @@ two -- same pattern as phase1/pipeline.py's `run_*` functions.
 import difflib
 import re
 from collections import Counter
+from functools import lru_cache
 
-from sentence_transformers import SentenceTransformer
-
-from common import ollama_client
+from common import matching, ollama_client
 from phase2.condensation_report import parse_condensed_blocks
+
+# sentence_transformers is imported lazily, inside extract_source_metadata --
+# the only function here that embeds anything. Everything else in this module
+# is regex, difflib and counting: the sanity checks, the F/T/R/C classifier,
+# the verbatim-overlap scan, cluster coverage. Keeping the heavy import out of
+# module scope is what lets those be imported and tested without a transformer
+# stack installed (same pattern as common/file_convert.py's lazy pypdf import).
 
 FUNCTION_WORD_SET = {
     "a", "an", "the", "this", "that", "these", "those",
@@ -560,6 +566,8 @@ def extract_source_metadata(source_text, model, embedder_name="all-MiniLM-L6-v2"
     the very start of virtually every document, so the first lead_chunks
     chunks are always included alongside the semantically retrieved ones
     rather than relying on embedding similarity to surface them."""
+    from sentence_transformers import SentenceTransformer
+
     chunks = _chunk_source_text(source_text)
     if not chunks:
         return "Unclear", "Unclear", "Unclear"
@@ -825,11 +833,30 @@ def run_generate_for_rate(rate, ordered_sentences, cluster_key_terms, target_wor
 # VERBATIM-OVERLAP SCAN
 # ============================================================
 
+@lru_cache(maxsize=4)
+def _source_without_punctuation(source_lower):
+    """Punctuation-stripped source, memoized on the source string itself.
+
+    `in_source` below is called once per candidate window per position by
+    scan_verbatim_overlap, and once per sentence by classify_span -- tens of
+    thousands of times per rate, always against the same source. Stripping
+    punctuation from the whole source inside that loop was the entire cost of
+    the scan: measured on the committed 83,164-character corpus, 1.21 ms per
+    call and 17.3 s for the shortest of the three condensations (747 words),
+    rising past a minute for the 3,000-word ones.
+
+    Memoizing changes no comparison and no result -- the value was already
+    recomputed identically every call. maxsize=4 keeps a couple of corpora
+    resident at ~80KB each; Python caches a string's own hash after the first
+    lookup, so the repeated cache probe costs nothing either.
+    """
+    return re.sub(r"[^\w\s]", "", source_lower)
+
+
 def in_source(chunk_words, source_lower):
     phrase = " ".join(w.lower() for w in chunk_words)
     phrase_clean = re.sub(r"[^\w\s]", "", phrase)
-    src_clean = re.sub(r"[^\w\s]", "", source_lower)
-    return phrase_clean in src_clean
+    return phrase_clean in _source_without_punctuation(source_lower)
 
 
 def scan_verbatim_overlap(condensed_text, source_text, min_window=4, max_window=40):
@@ -1295,7 +1322,7 @@ def compute_injection_stats(all_spans, condensed_text, source_text):
     }
 
 
-def _cluster_hit_counts(text, clusters, stemmer):
+def cluster_hit_counts(text, clusters, stemmer):
     """Token-occurrence hit counts per cluster, for one text -- how many
     times each of the cluster's stems appears as a token (via the same
     tokenize-and-stem approach used elsewhere in this pipeline), plus
@@ -1312,10 +1339,23 @@ def _cluster_hit_counts(text, clusters, stemmer):
         key_terms = list(cluster.get("stems", [])) + list(cluster.get("ngrams", []))
         count = 0
         for term in key_terms:
-            normalized = term.rstrip("*").lower()
-            count += text_lower.count(normalized) if " " in normalized else stem_counts[normalized]
+            normalized = matching.normalize_cluster_term(term)
+            if " " in normalized:
+                # Strategy 3 -- raw substring. This is the undercount recorded
+                # as L1 in LIMITATIONS.md; see common/matching.py for the
+                # measurement and for the strategy that replaces it.
+                count += matching.ngram_substring_count(text_lower, term)
+            else:
+                count += stem_counts[normalized]
         hits[cluster["name"]] = count
     return hits
+
+
+# Kept as an alias, not removed: phase3/distant_reading.py reached across a
+# module boundary for the leading-underscore name, and so may anything a
+# researcher has written against this pipeline. The public name above is what
+# new code should use.
+_cluster_hit_counts = cluster_hit_counts
 
 
 def compute_cluster_coverage(phase1_state, condensed_text, source_text, stemmer, tolerance_pp=5.0):
@@ -1330,8 +1370,8 @@ def compute_cluster_coverage(phase1_state, condensed_text, source_text, stemmer,
     source's own share; DARK if a cluster with real presence in the
     source (>0 hits) gets zero hits in the condensation; WARN otherwise."""
     clusters = phase1_state.get("clusterDefs", [])
-    source_hits = _cluster_hit_counts(source_text, clusters, stemmer)
-    condensed_hits = _cluster_hit_counts(condensed_text, clusters, stemmer)
+    source_hits = cluster_hit_counts(source_text, clusters, stemmer)
+    condensed_hits = cluster_hit_counts(condensed_text, clusters, stemmer)
 
     source_total = sum(source_hits.values())
     condensed_total = sum(condensed_hits.values())

@@ -93,6 +93,60 @@ Phase 3 run fine on CPU.
 
 ---
 
+## Before you run it
+
+Things you would otherwise find out the hard way. The full register of known
+defects, each with its measurement, is [LIMITATIONS.md](LIMITATIONS.md).
+
+**Corpus size.** Roughly 2,000,000 characters is the hard ceiling
+(`common/limits.py::SPACY_MAX_LENGTH`), and memory binds well before that:
+Phase 2 holds one parsed spaCy `Doc` per sentence for the whole corpus. The
+worked example is 83,164 characters — an article, not a book. You get an
+explicit message naming the limit rather than spaCy's own `E088`.
+
+**The condensation is not reproducible run to run.** Generation passes
+`num_ctx` and `repeat_penalty` to Ollama and nothing else — no `seed`, no
+`temperature`. Two identical runs produce different condensations. What is
+auditable is every *decision*, which is the claim the architecture actually
+makes; the generated text itself is not reproducible, and the verification
+statistics recompute from whatever text was accepted.
+
+**The committed example predates dependency pinning.** No library or model
+version was recorded when those artifacts were produced, and both models are
+loaded from Hugging Face `main` with no pinned revision. A rerun today may
+cluster differently. `requirements.txt` does **not** pin versions yet: a
+lock validated against the golden tests on a GPU machine is tracked in
+[#4](https://github.com/PUC-Behring-AI/peel-local/issues/4).
+
+**Phase 0 is destructive and unlogged.** `--clean` deletes everything from the
+first line matching `Notes`, `References` or `Bibliography` to the end of the
+file — so a mid-document "Notes" heading silently truncates the corpus — and,
+unlike every other phase, it writes no decision log. Inspect
+`data/<corpus>/raw/<corpus>.txt` after cleaning before trusting a run. See
+`L3`/`L4` in LIMITATIONS.md.
+
+**Cluster n-grams are lemma reconstructions, not quotations.** Phase 1 mines
+them from a lemmatised, stopword-filtered stream, so `expertise opacity trust`
+came from "Expertise, opacity, and trust" and does not occur literally
+anywhere. Two consequences: the cluster-coverage table and the Phase 3
+prevalence chart undercount them (`L1`), while the rest of Phase 3 counts them
+correctly — so those two views of the same report disagree.
+
+**A stem can belong to more than one cluster.** The oversized-cluster re-split
+pools every oversized cluster into one pass, so a stem can land in two of the
+results (11 do, in the worked example). The Phase 3 report lists them under
+*Cross-cluster stems*; cluster-coverage percentages are shares of a total
+that counts such a stem once per cluster (`L5`).
+
+**The web interface has ten decision screens, not nine.** Setup, parameter
+sweep, flagged-term review, cluster review, Phase 2 setup, **sanity review**,
+escalation, borderline-classification review, collocation-pair selection, and
+completion — plus a progress console that is context, not a decision point.
+The sanity-review screen is where you decide whether to keep a trial that hit
+the target word count but failed a deterministic sanity check.
+
+---
+
 ## Technologies
 
 ### NLP
@@ -737,9 +791,16 @@ commit or discard your own corpus's log as you choose.
 ```
 peel-local/
 ├── README.md
+├── LICENSE            # Apache-2.0 -- covers the source code
+├── LICENSE-DOCS       # CC BY 4.0 -- covers docs, figures, generated reports
+├── NOTICE             # copyright, and what the licences do NOT cover
+├── CITATION.cff       # machine-readable citation metadata
+├── LIMITATIONS.md     # known defects, measured, each with its issue number
+├── CONTRIBUTING.md    # venv setup, the gate, and the behaviour-freeze rule
 ├── FUNCTIONS.md       # function-by-function map of the codebase
 ├── RUN_PIPELINE_GUIDE.md  # detailed run_pipeline.py CLI guide
 ├── run_pipeline.py    # Phase 0 (optional) -> 1 -> 2 -> 3 -> standalone report export, one command
+├── tests/             # characterisation + golden tests; see CONTRIBUTING.md for the tiers
 ├── PEEL-Local-pipeline-overview.png / .pdf  # compact, screen-by-screen pipeline diagram
 ├── PEEL-Local-pipeline-full.html            # full interactive pipeline diagram, click-to-expand
 ├── docs/              # ai_prompts_catalog.md -- every AI-model prompt, where it's implemented
@@ -756,6 +817,7 @@ peel-local/
 │                       # terms.py + report.py -- distant reading, no notebook
 ├── webapp/            # Flask web interface -- app.py, pipeline_session.py, static/
 └── data/              # per-corpus inputs/outputs (tracked, see contract above)
+    └── <corpus>/PROVENANCE.md  # source work's authorship, DOI, and licence
 ```
 
 (`docgraph/` also exists at the repo root -- the generator tooling for the
@@ -765,10 +827,62 @@ committed deliverable, not the code that builds them. Regenerate with
 
 ---
 
+## Citing PEEL-Local
+
+If you use PEEL-Local, cite the paper rather than only the software:
+
+> Miranda e Silva, J. V., de Souza, C., Souza, A., & Cerqueira, R. (2026).
+> PEEL-Local: A Modular, Auditable Architecture for Researcher-Governed
+> AI-Assisted Text Summarization.
+
+[CITATION.cff](CITATION.cff) carries the machine-readable version (GitHub's
+"Cite this repository" button reads it). If you reproduce or build on a
+specific run's artifacts, cite the tag that produced them as well -- see
+the next section.
+
+---
+
+## The `v1.0.0` tag, and why it matters
+
+The tag `v1.0.0` (**not yet published** -- see
+[#8](https://github.com/PUC-Behring-AI/peel-local/issues/8)) will mark the exact commit whose outputs the paper reports. Everything under
+`data/` at that tag *is* the paper's evidence: Phase 1's 61 flagged terms
+and 11 final clusters, Phase 2's three condensations and their verification
+statistics, Phase 3's term-frequency tables.
+
+Release-hardening work (tests, pinned dependencies, licensing, documentation)
+lands *after* that tag and is held to a rule: **it must not change what the
+pipeline produces.** The golden tests under `tests/` assert exactly that, by
+regenerating artifacts and comparing them against the committed ones. Fixes
+that would change an output are tracked as issues instead and listed in
+[LIMITATIONS.md](LIMITATIONS.md), so a reader can see what is known to be
+wrong without having to rediscover it.
+
+---
+
 ## License
 
-PEEL-Local is released under the [Creative Commons Attribution 4.0
-International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
-license -- see [LICENSE](LICENSE) for the full legal text. You are free to
-use, share, and adapt this work for any purpose, including commercially,
-as long as you give appropriate attribution.
+This repository carries two licences, because it contains two different
+kinds of thing, plus a third-party work that neither covers.
+
+| What | Licence |
+|---|---|
+| **Source code** -- everything in `common/`, `phase0/`–`phase3/`, `webapp/`, `run_pipeline.py`, `tests/` | [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) -- see [LICENSE](LICENSE) and [NOTICE](NOTICE) |
+| **Documentation, figures, and PEEL-Local's own generated reports** -- `README.md`, `FUNCTIONS.md`, `RUN_PIPELINE_GUIDE.md`, `docs/`, the pipeline diagrams, and the HTML/JSON artifacts this pipeline writes | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) -- see [LICENSE-DOCS](LICENSE-DOCS) |
+| **The example corpus text under `data/*/raw/`, and the passages of it quoted inside the derived artifacts in those directories** | Not covered by either of the above. It is a third-party work under its own terms -- see the `PROVENANCE.md` file in each `data/<corpus>/` directory |
+
+Apache-2.0 is used for the code rather than a Creative Commons licence
+because CC licences are not designed for software: they grant no patent
+rights and carry no software-appropriate warranty disclaimer. Creative
+Commons itself recommends against using them for code.
+
+**On the example corpus.** The worked example runs on Boisseau (2026),
+*Synthese* 207(3):104, which is published under CC BY-NC-ND 4.0. Each
+`data/<corpus>/PROVENANCE.md` records its authorship, DOI, and licence;
+states that Phase 0's cleaning removed the article's own copyright line
+along with the masthead; and tabulates how much of the source text persists
+in each derived artifact. Redistribution permission has been requested from
+the author and publisher and is tracked in
+[#1](https://github.com/PUC-Behring-AI/peel-local/issues/1). If you reuse
+anything from a `data/` directory, attribute the source work and observe
+its terms, not this repository's.

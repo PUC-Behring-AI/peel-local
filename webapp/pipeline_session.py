@@ -32,13 +32,12 @@ import threading
 import traceback
 from contextlib import redirect_stdout
 
-import spacy
 import torch
 from nltk.stem import PorterStemmer
 
 from common.paths import CorpusPaths
 from common.decisions import DecisionLog
-from common import standalone_report, file_convert, parameter_sweep, resume
+from common import standalone_report, file_convert, limits, parameter_sweep, resume
 from phase0.clean_corpus import clean_text
 from phase1 import pipeline as phase1_pipeline
 from phase2 import pipeline as phase2_pipeline, condense, condensation_report
@@ -257,9 +256,13 @@ class PipelineSession:
         # persisted -- source-metadata detection falls back to the saved
         # raw text instead, which may already be Phase-0-cleaned.
         self._raw_source_text = self.text
-        self.nlp = spacy.load(self._resolve_lang_model())
+        self.nlp = limits.load_spacy(self._resolve_lang_model())
         self.stemmer = PorterStemmer()
         self.doc = None
+
+        size_note = limits.describe_corpus_size(self.text)
+        if size_note:
+            print(size_note)
 
         print(f"Resumed corpus {self.corpus_name!r} at Phase 2 (loaded {self.paths.phase1_state_json()}).")
         return {
@@ -283,8 +286,12 @@ class PipelineSession:
         self.phase1_state = phase2_pipeline.load_phase1_state(self.paths.phase1_state_json())
         with open(self.paths.raw_txt(), "r", encoding="utf-8") as f:
             self.text = f.read()
-        self.nlp = spacy.load(self._resolve_lang_model())
+        self.nlp = limits.load_spacy(self._resolve_lang_model())
         self.stemmer = PorterStemmer()
+
+        size_note = limits.describe_corpus_size(self.text)
+        if size_note:
+            print(size_note)
 
         self.condensed_texts = {}
         for rate in self._resume_available_rates:
@@ -311,11 +318,15 @@ class PipelineSession:
         here (rather than only in _step_start_to_flagged_review) so the
         sweep and the eventual real extraction share one spaCy parse --
         see that step's `if self.doc is None` guard."""
-        self.nlp = spacy.load(self.config["lang_model"])
+        self.nlp = limits.load_spacy(self.config["lang_model"])
         self.stemmer = PorterStemmer()
 
         with open(self.paths.raw_txt(), "r", encoding="utf-8") as f:
             self.text = f.read()
+
+        size_note = limits.describe_corpus_size(self.text)
+        if size_note:
+            print(size_note)
         self.doc = self.nlp(self.text)
 
         word_frequency_percentile = self.config.get("word_frequency_percentile", 0.0)
@@ -355,10 +366,13 @@ class PipelineSession:
         print(f"Using device: {self.device}")
 
         if self.doc is None:
-            self.nlp = spacy.load(self.config["lang_model"])
+            self.nlp = limits.load_spacy(self.config["lang_model"])
             self.stemmer = PorterStemmer()
             with open(self.paths.raw_txt(), "r", encoding="utf-8") as f:
                 self.text = f.read()
+            size_note = limits.describe_corpus_size(self.text)
+            if size_note:
+                print(size_note)
             self.doc = self.nlp(self.text)
 
         self.top_stems = phase1_pipeline.extract_top_stems(

@@ -39,6 +39,34 @@ Single source of truth for every phase's file paths, keyed by `CORPUS_NAME`.
 | `DecisionLog(corpus_name, phase)` | Constructor; resolves the JSONL log path via `CorpusPaths` | Every notebook's config cell, `run_pipeline.py::main` |
 | `.record(step, decision_type, prompt, options=, choice=, extra=)` | Appends one JSON-Lines record with a UTC timestamp; returns the record | Every interactive `run_*` function in `phase1/pipeline.py` and `phase2/condense.py` |
 
+## `common/matching.py`
+
+The three different answers this pipeline gives to "does this cluster term
+occur here", named and compared in one place. They disagree; the module
+docstring is the comparison table and says which is correct and why. Nothing
+here changes which strategy a caller uses -- unifying them is `L1` in
+`LIMITATIONS.md`, held behind the behaviour freeze.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `normalize_cluster_term(term, stemmer=None, use_lemmas=True)` | Drops a trailing `*`, lowercases, and Porter-stems unless the caller works in lemma space | All three strategies, and `cluster_hit_counts` |
+| `stem_prefix_match(token, stems, stemmer=None, use_lemmas=True)` | Strategy 1: bidirectional prefix. The loosest -- `art` matches `article` and `artificial` -- but applied at n-gram *selection* time, not at counting time | `phase1/pipeline.py::token_matches_cluster_stem` |
+| `ngram_substring_count(text_lower, ngram)` | Strategy 3: literal substring count. Undercounts, because a mined n-gram is a lemma reconstruction rather than a quotation -- 22 of 33 score zero on the example corpus | `phase2/condense.py::cluster_hit_counts` |
+
+Strategy 2 -- exact stem plus a contiguous run of the lemmatised,
+stopword-filtered stream, which is the correct one -- lives in
+`phase3/terms.py` and is documented in that section below.
+
+## `common/limits.py`
+
+The corpus-size ceiling, and the single place spaCy is loaded -- so the CLI,
+the notebooks, and the webapp cannot drift apart on either.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `load_spacy(model_name)` | `spacy.load` plus this project's `SPACY_MAX_LENGTH`, and an actionable `SystemExit` instead of spaCy's E050 traceback when the model is not installed | `run_pipeline.py::run_phase1`/`_load_resume_state`, `webapp/pipeline_session.py` (4 sites), both notebooks' config cells |
+| `describe_corpus_size(text, max_length=)` | One-line note for a corpus over spaCy's own default (memory warning) or over the ceiling (hard error), else None -- same "return a note the caller prints" convention as `describe_stem_cap` | Everywhere the corpus text is read |
+
 ## `common/ollama_client.py`
 
 Minimal wrapper for a locally running [Ollama](https://ollama.com) instance.
@@ -180,6 +208,7 @@ Stem extraction, GlossBERT WSD, and Sentence-BERT/HDBSCAN clustering.
 | **`run_cluster_review(renamed_clusters, decisions)`** (interactive) | Per-cluster accept/rename/remove-stems/remove-ngrams flow; carries each cluster's `reembedded_stems` forward into `final_clusters`, filtered to stems that survive removal | phase1.ipynb, `run_pipeline.py::run_phase1` |
 | `build_phase1_state(final_clusters, excluded_cluster_ngrams)` | Assembles the final `phase1_state` dict (`excludedNgrams`/`clusterDefs`, the latter now including `reembedded_stems`/`reembedded_source` per cluster) | Phase 1's save cell, `run_pipeline.py` |
 | `save_phase1_state(state, path)` | Writes `phase1_state.json` | Same |
+| `find_oversized_clusters(clusters, max_cluster_size)` | Clusters still over `max_cluster_size` after `recluster_large_clusters` gave up -- surfaced rather than passed over silently, since the cap is not guaranteed to be met | `run_pipeline.py::run_phase1`, `webapp/pipeline_session.py::_step_after_flagged_review` |
 | `hex_to_rgb(h)` / `build_cluster_html(final_clusters, corpus_name, ...)` / `save_html(html, path)` | Tableau20-colored HTML cluster summary. Renders `reembedded_stems` via `REEMBEDDED_SOURCE_STYLE`, a fixed `{"main": (label, amber), "noise": (label, violet)}` lookup keyed by the cluster's `reembedded_source`, so the two bypass mechanisms are visually distinguishable, not just disclosed. Also prints a one-line color legend above the cluster table -- but only if at least one cluster actually has a non-empty `reembedded_stems` (`any(...)` over `final_clusters.values()`), so a clean run's export carries no explanation for a color it never uses | Phase 1's HTML export cell, `run_pipeline.py` |
 
 ## `phase2/pipeline.py`
@@ -241,7 +270,9 @@ are **interactive**. See README's condensation section for the taxonomy.
 | `flag_borderline_classifications(all_spans)` | Cross-checks F/T's POS/dependency-based verdict against the old lexical word-list heuristic and flags disagreement -- on the diff tokens for diff-based spans and for a phrase-match T with a strong (>=0.7 overlap -- deliberately stricter than R's own 0.5 "dominant match" bar, since a diff-based flag here is only trustworthy against a near-verbatim candidate) candidate source sentence, on the whole sentence only for the no-match fallback and a phrase-match T with no trustworthy candidate to diff against. The phrase-match diff path catches e.g. a metalinguistic-tagged sentence that's actually near-verbatim with one real word changed (real example: flagged as "diverges by 1 content-bearing token" instead of a much less informative "17 content-bearing tokens" for a sentence 94% overlapping its source) | Same |
 | **`run_injection_review(all_spans, borderline_flags, rate, decisions)`** (interactive) | Per-flag keep-or-reclassify prompt | phase2.ipynb, `run_pipeline.py::run_phase2` |
 | `compute_injection_stats(all_spans, condensed_text, source_text)` | `non_injected_pct` + `verbatim_overlap_pct` (two independent checks) | Phase 2's injection-analysis cell, `run_pipeline.py` |
-| `_cluster_hit_counts(text, clusters, stemmer)` | Token/phrase-occurrence hit counts per cluster, for one text | `compute_cluster_coverage` |
+| `cluster_hit_counts(text, clusters, stemmer)` | Token/phrase-occurrence hit counts per cluster, for one text. Matches a stem exactly but an n-gram by raw substring -- a known defect, see `LIMITATIONS.md` L1. `_cluster_hit_counts` remains as an alias for callers that used the private name | `compute_cluster_coverage`, `phase3/distant_reading.py::bin_cluster_frequencies` |
+| `estimate_num_ctx(prompt, target_words, buckets=)` | Rounds prompt + expected output up to the next Ollama context bucket, so the KV cache is not forced off the GPU by the model's own default | `attempt_condensation_trials` |
+| **`run_sanity_review_for_rate(rate, result, decisions, escalated=)`** (interactive) | For a rate where a trial hit the target word count but failed a generation sanity check: prints each candidate with the check(s) it failed and accepts one or rejects all. Never auto-picks | `run_generate_for_rate`, `run_pipeline.py::run_regeneration_loop` |
 | `compute_cluster_coverage(phase1_state, condensed_text, source_text, stemmer, tolerance_pp=)` | Per-cluster share of all cluster-vocabulary occurrences (source vs. condensation), with OK/WARN/DARK status | Phase 2's coverage cell, `run_pipeline.py` |
 
 ## `phase2/condensation_report.py`
@@ -357,6 +388,7 @@ Top-level, non-interactive Phase 3 orchestration -- mirrors
 | Function | Purpose | Called from |
 |---|---|---|
 | `assign_cluster_colors(clusterdefs, tableau20=)` | Tableau20 colours, sequential by cluster order | `prepare_phase3_context` |
+| `describe_collocation_skip_reason(clusterdefs, colloc_candidates, condensed_texts)` | The specific reason the collocation comparison is being skipped, or None -- so the CLI console, the webapp log, and the report's Provenance section give one explanation, not three | `run_pipeline.py::run_phase3`, `webapp/pipeline_session.py`, `build_phase3_report` |
 | `prepare_phase3_context(phase1_state, source_text, nlp, stemmer)` | Parses the source, builds stopwords, scans for collocations -- everything needed before the one researcher decision | `run_pipeline.py::run_phase3`, `webapp/pipeline_session.py::_step_prepare_phase3` |
 | `build_phase3_report(context, corpus_name, phase1_state, source_text, stemmer, condensed_texts, selected_pairs, nlp, n_bins=)` | Builds every section and returns the report HTML; `condensed_texts={}` skips just the Source-vs-Summary section. The Distant Reading section's word cloud/trend chart/phrase table/term stats now run once per document -- Source plus every approved condensation rate -- side by side (`build_side_by_side_html`), not source-only; only the full-text reader stays source-only. Verified real-data end-to-end: with one approved rate, exactly 2 columns and 2 word-cloud images per analysis; with none, the section renders unwrapped, byte-identical to before this change | Same callers |
 
@@ -376,6 +408,85 @@ report export on one new corpus in a single script -- see README's
 | `run_phase1(args, paths, decisions)` | Mirrors `phase1.ipynb` cell-by-cell -- including, if `--sweep` is given, `common.parameter_sweep.run_parameter_sweep_setup` right before stem extraction; returns `(phase1_state, nlp, stemmer, text)` |
 | `run_phase2(args, paths, decisions, phase1_state, nlp, stemmer, text, original_text)` | Mirrors `phase2.ipynb` cell-by-cell, plus `condense.run_source_metadata_setup`, `condense.run_adversarial_review` per rate (right before `process_and_save_rate`), `run_phase3` (right after the initial rates' reports are built), and the post-completion regeneration loop (`run_regeneration_loop`) -- none of which the notebook has. Reached from `--start-phase` 1 or 2 |
 | `run_phase3(args, paths, phase1_state, nlp, stemmer, text, condensed_texts)` | No notebook equivalent. Builds the Phase 3 context, runs `collocations.run_collocation_review` if there's a condensation to compare against, and writes the distant-reading report -- own `DecisionLog(phase="phase3")`. Reached from `--start-phase` 1, 2 (via `run_phase2`), or 3 (called directly) |
+| `edit_prompt_via_tempfile(default_prompt)` | Writes the rendered condensation prompt to a `mkstemp` scratch file for the researcher to edit in their own editor, waits for ENTER, reads it back -- avoids multi-line terminal input for a multi-paragraph prompt | `run_regeneration_loop` |
 | `_print_corpus_list()` | Backs `--list-corpora`: prints every corpus from `resume.list_corpora()` with `resume.corpus_phase_summary()`'s resumable phases and condensed rates, then returns without running anything |
 | `_load_resume_state(args, paths)` | Backs `--start-phase 2`/`3`: loads `text`/`phase1_state`/`nlp`/`stemmer` from the existing corpus on disk instead of producing them via `place_raw_text`/`run_phase1`. `lang_model` is recovered from Phase 1's own decision log via `resume.find_last_decision_choice` if available, else `--lang-model`'s default |
 | `main()` | Branches on `--start-phase`: `1` wires `place_raw_text` -> `run_phase1` -> `run_phase2` as before; `2` calls `_load_resume_state` then `run_phase2` directly (with `original_text` falling back to the saved raw text, since the true pre-clean original is never persisted); `3` calls `_load_resume_state`, reconstructs `condensed_texts` from every existing condensed-rate file on disk, then calls `run_phase3` directly. `resume.check_prerequisites` gates `--start-phase 2`/`3` before `paths.ensure_dirs()` runs -- checked first so a failed check doesn't leave behind empty `data/<corpus>/*` directories |
+
+---
+
+## `webapp/app.py`
+
+The Flask layer: routing, request validation, and translating a
+`PipelineSession`'s state into JSON. No pipeline logic lives here -- every
+route either reads session state or forwards an already-validated decision
+to `PipelineSession`.
+
+One run at a time, by design: this is a local, single-researcher tool bound
+to `127.0.0.1`, not a multi-user server. Starting a new run replaces the
+previous session object.
+
+| Function | Purpose | Called from |
+|---|---|---|
+| `index()` | Serves `static/index.html` | `GET /` |
+| `status()` | The polling endpoint: status, current step, new log output since `?since=`, the pending decision, and (once complete) the output manifest | `GET /api/status` |
+| `start()` | Validates the corpus name (`^[A-Za-z0-9_-]+$`), the uploaded file, and every config field, then starts a new session at Phase 1 | `POST /api/start` |
+| `list_corpora()` | Every corpus under `data/` with the phases it satisfies prerequisites for, so the picker can show what is actually resumable | `GET /api/corpora` |
+| `resume_corpus()` | Resumes an existing corpus at Phase 2 or 3; a failed prerequisite check returns a validation message, not a 500 | `POST /api/resume` |
+| `reset()` | Clears the session to idle. `force=true` (the header's Restart button) discards a run in flight -- the background thread has no cancellation hook, so it finishes against the orphaned session object and its result is never observed | `POST /api/reset` |
+| `decide_flagged_terms()` | Applies the batch of flagged-term review choices | `POST /api/decisions/flagged-terms` |
+| `decide_cluster_review()` | Applies the batch of cluster accept/rename/prune/drop decisions | `POST /api/decisions/cluster-review` |
+| `decide_parameter_sweep()` | Applies the chosen `frequency_percentile`/`max_stems` from the sweep screen | `POST /api/decisions/parameter-sweep` |
+| `decide_phase2_setup()` | Applies sentence-selection config plus, if condensation was requested, rates/models/trials and the confirmed source metadata | `POST /api/decisions/phase2-setup` |
+| `detect_metadata()` | Runs the retrieval-augmented title/author/date extractor against the untouched pre-Phase-0 text, so the setup form opens pre-filled. Synchronous, not a background job -- one small LLM call | `GET /api/detect-metadata` |
+| `decide_sanity_review()` | Applies, per rate, which sanity-flagged trial to keep (or none) | `POST /api/decisions/sanity-review` |
+| `decide_escalation()` | Applies, per rate, whether to retry with the full source text in the prompt | `POST /api/decisions/escalation` |
+| `decide_injection_review()` | Applies keep-or-reclassify decisions for the borderline F/T flags | `POST /api/decisions/injection-review` |
+| `decide_collocation_review()` | Applies the selected collocation-pair indices | `POST /api/decisions/collocation-review` |
+| `regenerate_prompt_preview()` | Returns the fully rendered default condensation prompt for a rate, so the researcher can see and edit exactly what will be sent | `GET /api/regenerate/prompt-preview` |
+| `regenerate()` | Starts a post-completion regeneration at a rate, optionally with a hand-edited prompt used verbatim | `POST /api/regenerate` |
+| `ollama_models()` | Ollama availability plus the installed model list, for the setup screen's dropdowns | `GET /api/ollama/models` |
+| `get_file(corpus, subpath)` | Serves a generated artifact. Validates the corpus name and resolves the path, refusing anything that escapes `data/<corpus>/` (`Path.is_relative_to`) | `GET /api/files/<corpus>/<subpath>` |
+| `_error(message, status=)` | Uniform `{"ok": false, "error": …}` response | Every route above |
+| `_require_decision(expected_type)` | Guards a decision route: rejects unless the session is `awaiting_input` on that exact decision type | Every `decide_*` route |
+
+## `webapp/pipeline_session.py`
+
+`PipelineSession` -- the fourth way to drive the same pipeline, alongside the
+CLI and the two notebooks. It calls the identical functions in
+`phase1/pipeline.py`, `phase2/condense.py` and the rest; nothing about the
+pipeline is reimplemented here.
+
+What *is* specific to this layer: the interactive `run_*` loops in those
+modules are built around blocking `input()` and cannot serve a web request,
+so this class calls the lower-level pure functions they wrap
+(`record_accepted_instance`, `attempt_condensation_trials`,
+`classify_condensation`, …) and applies decisions submitted as JSON instead.
+Every decision is still written to the same `DecisionLog`, tagged
+`extra={"source": "web"}` -- the same convention as the CLI's `"cli"`.
+
+Each pipeline chunk runs on a background thread with `stdout` redirected into
+a growing log the frontend polls. A chunk either finishes the run (returns
+`None`) or returns `{"type": …, "payload": …}` describing the next decision
+the browser must collect.
+
+| Method | Purpose |
+|---|---|
+| `status_dict(since=0)` | Status, current step, log tail from `since`, pending decision, error, and the manifest once complete |
+| `start(corpus_name, file_storage, clean, config)` | Entry point for a new corpus: converts the upload to text (`file_convert`), optionally Phase-0-cleans it, keeps the untouched original in memory for metadata detection, and dispatches to the sweep or straight to stem extraction |
+| `resume(corpus_name, start_phase, config=None)` | Alternative entry point: resumes an existing corpus at Phase 2 or 3, sharing `common/resume.py`'s prerequisite checks with the CLI's `--start-phase` |
+| `detect_metadata(ollama_model)` | Runs `condense.extract_source_metadata` against the pre-Phase-0 text; prints to the server console, since this route's output never reaches the browser's log panel |
+| `apply_flagged_term_review(decisions_payload)` | Applies `default`/`predicted`/`candidate`/`manual`/`delete` per flagged term. A term absent from the payload is never accepted -- see `LIMITATIONS.md` L7 |
+| `apply_cluster_review(entries)` | Builds `final_clusters` from the submitted per-cluster decisions, looking up `reembedded_stems` server-side rather than trusting the browser to round-trip them |
+| `apply_parameter_sweep(choice, frequency_percentile, max_stems)` | Commits the chosen sweep values and continues into stem extraction |
+| `apply_phase2_setup(top_n, density_percentile, run_condensation, rates_str, ollama_model, max_trials, adversarial_model=, title=, authors=, date=)` | Records sentence-selection and condensation config plus the researcher-confirmed source metadata, then starts generation |
+| `apply_sanity_review(decisions_by_rate)` | Keeps or rejects, per rate, a trial that hit the target word count but failed a sanity check; a rejection at the initial stage still falls through to escalation |
+| `apply_escalation(decisions_by_rate)` | Per rate, retries with the full source text in the prompt or gives up, reporting which of the two reasons applied |
+| `apply_injection_review(decisions_by_rate)` | Applies keep-or-reclassify to each borderline F/T span, logging both the original and new type |
+| `apply_collocation_review(selected_indices)` | Resolves indices through `collocations.select_pairs_by_index` -- the same resolution rule the CLI uses -- and builds the Phase 3 report |
+| `preview_regeneration_prompt(rate)` | The rendered default prompt for a rate, for the inline editor |
+| `start_regeneration(rate, prompt_override=None)` | Re-runs generation for a rate, using the submitted prompt verbatim if one was given, then re-runs the whole verification and export path |
+| `_run_bg(target, current_step="")` | Runs one chunk on a daemon thread with `stdout` teed into the session log; sets `complete`, `awaiting_input` or `error` from the result |
+| `_resolve_lang_model()` | Recovers the spaCy model a resumed corpus's Phase 1 actually used, from its decision log, falling back to the configured default |
+| `_rel(path)` | A path relative to the corpus's `data/` root, forward-slashed -- what `GET /api/files/...` needs |
+| `_step_*` | The pipeline chunks themselves, in run order: `_step_run_parameter_sweep`, `_step_start_to_flagged_review`, `_step_after_flagged_review`, `_step_finish_phase1`, `_step_select_sentences_and_generate`, `_step_apply_sanity_review`, `_step_apply_escalation`, `_step_injection_analysis`, `_step_process_and_save_rate`, `_step_prepare_phase3`, `_step_build_phase3_report`, `_step_regenerate_after_text` |
