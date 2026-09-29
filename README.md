@@ -732,6 +732,29 @@ commit or discard your own corpus's log as you choose.
 
 ---
 
+## Additional experiments
+
+### Adversarial-reviewer audit (Phase 2)
+
+`data/peel-local_adversarial_test/` is a standalone measurement of how
+often Phase 2's adversarial reviewer (see
+[Phase 2 condensation & injection review](#phase-2-condensation--injection-review)
+above) fails to earn its keep -- delivering nothing usable back to the
+pipeline, or declaring `FIXED` while returning the same text it was given.
+The design holds the input fixed: each of 1,155 calls (385 per
+configuration, across the paper's three qwen2b/qwen9b × 10/20-sentence
+configurations) sends the reviewer the exact condensation the paper's own
+run produced, varying only the model's sampling -- isolating the
+reviewer's own behavior from everything upstream of it. Full protocol,
+per-configuration breakdowns with Wilson 95% confidence intervals, SageMaker
+job cost/provenance, and stated limitations are in the folder's own
+`README.md`/`RESULTS.en.md` (English) and `LEIA-ME.md`/`RESULTS.md`
+(Portuguese, the file of record); the audit code
+(`code/adversarial_review_audit/`) and raw AWS/Mac-pilot outputs
+(`results/`) are included alongside.
+
+---
+
 ## Repository layout
 
 ```

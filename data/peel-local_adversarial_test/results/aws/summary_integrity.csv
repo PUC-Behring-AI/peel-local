@@ -1,0 +1,4 @@
+design,condition,n,max_ctx_used,n_done_reason_not_stop,n_ctx_used_ge_32768
+fixed-input,qwen2b-20,385,24194,0,0
+fixed-input,qwen9b-10,385,13716,0,0
+fixed-input,qwen9b-20,385,23059,0,0

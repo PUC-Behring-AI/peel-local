@@ -1,0 +1,4 @@
+design,condition,tag,n,k_no_output,k_same_text,k_expanded,k_ok,k_changed
+fixed-input,qwen2b-20,local,2,2,0,0,0,0
+fixed-input,qwen9b-10,local,2,0,0,0,1,1
+fixed-input,qwen9b-20,local,2,0,0,1,1,0

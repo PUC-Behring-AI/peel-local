@@ -1,0 +1,16 @@
+design,condition,group,k,n,share,ci95_lo,ci95_hi
+fixed-input,qwen2b-20,no_output,2,2,1.0,0.34238022750665303,1.0
+fixed-input,qwen2b-20,same_text,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen2b-20,expanded,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen2b-20,ok,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen2b-20,changed,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen9b-10,no_output,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen9b-10,same_text,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen9b-10,expanded,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen9b-10,ok,1,2,0.5,0.09453120573423074,0.9054687942657693
+fixed-input,qwen9b-10,changed,1,2,0.5,0.09453120573423074,0.9054687942657693
+fixed-input,qwen9b-20,no_output,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen9b-20,same_text,0,2,0.0,0.0,0.6576197724933469
+fixed-input,qwen9b-20,expanded,1,2,0.5,0.09453120573423074,0.9054687942657693
+fixed-input,qwen9b-20,ok,1,2,0.5,0.09453120573423074,0.9054687942657693
+fixed-input,qwen9b-20,changed,0,2,0.0,0.0,0.6576197724933469
